@@ -1,0 +1,49 @@
+{
+    "name": "training_planner/api",
+    "description": "Training Planner backend API (Slim, Action-Domain-Responder)",
+    "type": "project",
+    "authors": [
+        {
+            "name": "Daniel Vodička",
+            "email": "danik.vodicka@seznam.cz"
+        }
+    ],
+    "require": {
+        "php": "^8.5",
+        "slim/slim": "4.*",
+        "slim/psr7": "^1.8",
+        "php-di/php-di": "^7.0",
+        "vlucas/phpdotenv": "^5.6",
+        "firebase/php-jwt": "^7.1",
+        "doctrine/dbal": "^4.2",
+        "doctrine/migrations": "^3.8",
+        "ext-fileinfo": "*",
+        "ext-pdo": "*",
+        "ext-bcmath": "*",
+        "monolog/monolog": "^3.10"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.64",
+        "pestphp/pest": "^3.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/",
+            "App\\Migrations\\": "migrations/",
+            "Filesystem\\": "filesystem/"
+        }
+    },
+    "scripts": {
+        "format": "php-cs-fixer fix",
+        "test": "./vendor/bin/pest",
+        "test:unit": "./vendor/bin/pest tests/Unit",
+        "test:int": "./vendor/bin/pest tests/Integration",
+        "test:cover": "XDEBUG_MODE=coverage ./vendor/bin/pest --coverage"
+
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}

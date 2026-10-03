@@ -1,0 +1,7 @@
+{
+    "name": "DCE schedule application planner Backend (PHP)",
+    "dockerComposeFile": "../../docker-compose.yml",
+    "service": "backend",
+    "workspaceFolder": "/app"
+
+}
