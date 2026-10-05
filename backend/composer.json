@@ -38,8 +38,9 @@
         "test": "./vendor/bin/pest",
         "test:unit": "./vendor/bin/pest tests/Unit",
         "test:int": "./vendor/bin/pest tests/Integration",
-        "test:cover": "XDEBUG_MODE=coverage ./vendor/bin/pest --coverage"
-
+        "test:cover": "XDEBUG_MODE=coverage ./vendor/bin/pest --coverage",
+        "migrate": "doctrine-migrations migrate",
+        "migrate:generate": "doctrine-migrations generate"
     },
     "config": {
         "allow-plugins": {

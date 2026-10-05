@@ -1,0 +1,3 @@
+Seeders:
+    fakerphp/faker
+    composer require --dev doctrine/data-fixtures
