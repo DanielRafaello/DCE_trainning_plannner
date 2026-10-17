@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Middleware\CorsMiddleware;
+use App\Repositories\CategoryRepository;
+use App\Repositories\Contracts\CategoryRepositoryInterface;
 use App\Repositories\Contracts\RefreshTokenRepositoryInterface;
 use App\Repositories\Contracts\UserRepositoryInterface;
 use App\Repositories\RefreshTokenRepository;
@@ -120,6 +122,7 @@ return [
     // ─── Repositories ─────────────────────────────────────────────
     UserRepositoryInterface::class         => \DI\autowire(UserRepository::class),
     RefreshTokenRepositoryInterface::class => \DI\autowire(RefreshTokenRepository::class),
+    CategoryRepositoryInterface::class     => \DI\autowire(CategoryRepository::class),
 
     // ─── Services ─────────────────────────────────────────────────
 
