@@ -69,7 +69,7 @@ Vue application and is out of scope of this document except where it shapes the 
 
 | ID | Requirement |
 |---|---|
-| FR-CAT-01 | The system has the following **fixed** categories, seeded by a migration. Users cannot create, rename or delete them. |
+| FR-CAT-01 | The system has the following **fixed** categories, inserted by an idempotent seeder (`CategorySeeder`, part of `composer db:seed`) – required in every environment. Users cannot create, rename or delete them. |
 | FR-CAT-02 | Each category has a stable machine **slug** (used by the frontend for icons/colors/translations) and an English display name. |
 | FR-CAT-03 | Any authenticated user can list all categories. |
 
@@ -134,9 +134,9 @@ Vue application and is out of scope of this document except where it shapes the 
 |---|---|
 | FR-TODO-01 | A user can have **multiple** to-do lists, each with a **title** (1–100 chars). Lists are not tied to any date. |
 | FR-TODO-02 | The body of a list is **one HTML string** (`content`, up to 100 kB). Items, checkboxes and formatting exist only inside the HTML (produced by the frontend's rich-text editor); the backend does not store individual items. |
-| FR-TODO-03 | A user can create a list, rename it, replace its content, change the order of the lists and delete a list. |
+| FR-TODO-03 | A user can create a list, rename it, replace its content and delete a list. Lists are ordered by last update (most recently edited first). |
 | FR-TODO-04 | The backend **sanitizes** `content` on every save against an allowlist of tags/attributes (see NFR-10) – it never stores raw user HTML. |
-| FR-TODO-05 | Listing returns titles and metadata (`id`, `title`, `position`, `updated_at`) **without** `content`; the content is fetched per list. |
+| FR-TODO-05 | Listing returns titles and metadata (`id`, `title`, `updated_at`) **without** `content`; the content is fetched per list. |
 
 ---
 
@@ -176,10 +176,10 @@ Vue application and is out of scope of this document except where it shapes the 
 | NFR-04 | Rate limiting on all endpoints; stricter limits on login/register. |
 | NFR-05 | CORS restricted to the frontend origin; security headers on all responses, including error responses. |
 | NFR-06 | Passwords are hashed with Argon2id/bcrypt; refresh tokens are stored hashed. |
-| NFR-07 | The schema is managed by Doctrine Migrations; the fixed categories are seeded by a migration. |
+| NFR-07 | The schema is managed by Doctrine Migrations; the fixed categories are inserted by a seeder (`migrations/Seeders`), not by a migration. |
 | NFR-08 | The week endpoint responds within 200 ms for a typical week (≤ 100 events), so it needs indexes on `(user_id, start_at)`. |
 | NFR-09 | Business logic is covered by automated tests (unit tests for services/validation, integration tests for endpoints). |
-| NFR-10 | To-do HTML is sanitized server-side with a maintained library (e.g. `symfony/html-sanitizer`). Allowlist (aligned with the frontend editor): `p, br, strong, em, u, s, h1–h3, ul, ol, li, blockquote, code, pre, a[href]` (only `http(s)`/`mailto` links) and the editor's task-list attributes (e.g. `data-type`, `data-checked`). No `style`, `on*` attributes, `script` or `iframe`. |
+| NFR-10 | To-do HTML is sanitized server-side by `App\Infrastructure\HTMLContentSanitizer` (`symfony/html-sanitizer`), aligned with the Quill editor. Allowlist: `p, br, span, blockquote, pre, strong, b, em, i, u, s, h1–h4, ul, ol, li, a, table, thead, tbody, tr, th, td`; attributes `class` (Quill formatting classes), `style` on `span, p, li` (Quill colors/sizes), `data-list` on `li` and `data-checked` on `ul` (checklists), `href, title, target` on `a` (only `http(s)`/`mailto`, `rel="noopener noreferrer"` is forced), `colspan, rowspan` on cells. Everything else is removed, including `on*` attributes, `script` and `iframe`. Max. input 100 kB; the length is checked again after sanitizing. |
 
 ---
 
@@ -191,12 +191,13 @@ refresh_tokens   (id, user_id FK, token_hash, expires_at, revoked_at, created_at
 categories       (id, slug UNIQUE, name, position)                      -- fixed, seeded
 subcategories    (id, user_id FK, category_id FK, name, color CHAR(7), created_at, updated_at)
                  UNIQUE (user_id, category_id, lower(name))
-events           (id, user_id FK, category_id FK, subcategory_id FK NULL ON DELETE RESTRICT,
+events           (id, user_id FK, category_id FK, subcategory_id NULL,
+                  FK (subcategory_id, user_id, category_id) → subcategories (id, user_id, category_id)  -- blocks delete,
                   title, description, start_at, end_at,
                   status CHECK (status IN ('planned','done','skipped')), created_at, updated_at)
                  INDEX (user_id, start_at)
 day_notes        (id, user_id FK, date, content, updated_at)  UNIQUE (user_id, date)
-todo_lists       (id, user_id FK, title, content TEXT, position, created_at, updated_at)
+todo_lists       (id, user_id FK, title, content TEXT, created_at, updated_at)
 ```
 
 ## 13. API Endpoints (sketch)
@@ -215,7 +216,6 @@ todo_lists       (id, user_id FK, title, content TEXT, position, created_at, upd
 | GET / PUT | `/days/{date}/note` | DAY-01…03 |
 | GET / POST | `/todo-lists` | TODO-01, 03, 05 |
 | GET / PATCH / DELETE | `/todo-lists/{id}` | TODO-02…04 |
-| PUT | `/todo-lists/order` (array of ids) | TODO-03 |
 | GET | `/stats/categories?from=&to=&status=` | STAT-01…04 |
 | GET | `/stats/subcategories?category=&from=&to=` | STAT-03 |
 | GET | `/stats/timeline?from=&to=&groupBy=day\|week\|month` | STAT-05 |

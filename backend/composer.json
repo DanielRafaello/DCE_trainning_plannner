@@ -18,6 +18,7 @@
         "doctrine/dbal": "^4.2",
         "doctrine/migrations": "^3.8",
         "ext-fileinfo": "*",
+        "symfony/html-sanitizer": "^7.4",
         "ext-pdo": "*",
         "ext-bcmath": "*",
         "monolog/monolog": "^3.10"
