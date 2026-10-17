@@ -15,10 +15,10 @@ use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
  * Verifies the Authorization: Bearer <token> header and exposes the claims
  * as request attributes (user_id, company_id, role) for downstream Actions.
  */
-class JwtAuthMiddleware implements MiddlewareInterface
+readonly class JwtAuthMiddleware implements MiddlewareInterface
 {
     public function __construct(
-        private readonly JwtService $jwt,
+        private JwtService $jwt,
     ) {
     }
 

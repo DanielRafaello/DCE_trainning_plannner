@@ -23,11 +23,11 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Errors:   401 Missing bearer token. / Invalid or expired token.
  *           404 not.found.user — the account was deleted after the token was issued.
  */
-final class MeAction
+final readonly class MeAction
 {
     public function __construct(
-        private readonly AuthServiceInterface $authService,
-        private readonly MeResponder $responder,
+        private AuthServiceInterface $authService,
+        private MeResponder          $responder,
     ) {
     }
 
