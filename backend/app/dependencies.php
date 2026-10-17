@@ -6,8 +6,10 @@ use App\Middleware\CorsMiddleware;
 use App\Repositories\CategoryRepository;
 use App\Repositories\Contracts\CategoryRepositoryInterface;
 use App\Repositories\Contracts\RefreshTokenRepositoryInterface;
+use App\Repositories\Contracts\SubcategoryRepositoryInterface;
 use App\Repositories\Contracts\UserRepositoryInterface;
 use App\Repositories\RefreshTokenRepository;
+use App\Repositories\SubcategoryRepository;
 use App\Repositories\UserRepository;
 use App\Services\Auth\AuthService;
 use App\Services\Contracts\Auth\AuthServiceInterface;
@@ -123,6 +125,7 @@ return [
     UserRepositoryInterface::class         => \DI\autowire(UserRepository::class),
     RefreshTokenRepositoryInterface::class => \DI\autowire(RefreshTokenRepository::class),
     CategoryRepositoryInterface::class     => \DI\autowire(CategoryRepository::class),
+    SubcategoryRepositoryInterface::class  => \DI\autowire(SubcategoryRepository::class),
 
     // ─── Services ─────────────────────────────────────────────────
 
