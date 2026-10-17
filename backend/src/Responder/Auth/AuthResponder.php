@@ -8,9 +8,9 @@ use App\Domain\User;
 use App\Responder\JsonResponder;
 use Psr\Http\Message\ResponseInterface as Response;
 
-class AuthResponder extends JsonResponder
+final class AuthResponder extends JsonResponder
 {
-    public function response(Response $response, string $token, string $refreshToken, User $user, int $status): Response
+    public function respond(Response $response, string $token, string $refreshToken, User $user, int $status): Response
     {
         return $this->json($response, [
             'token' => $token,

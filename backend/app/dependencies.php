@@ -15,7 +15,9 @@ use App\Settings\SettingsFactory;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Monolog\Formatter\JsonFormatter;
+use Monolog\Handler\RotatingFileHandler;
 use Monolog\Handler\StreamHandler;
+use Monolog\Handler\WhatFailureGroupHandler;
 use Monolog\Level;
 use Monolog\Logger;
 use Psr\Container\ContainerInterface;
@@ -69,9 +71,20 @@ return [
         $handler = new StreamHandler('php://stderr', Level::Debug);
 
         // launch JSON formatting
-        $handler->setFormatter(new JsonFormatter());
+        $formatter = new JsonFormatter();
+        $formatter->includeStacktraces(); // logged exceptions keep their trace
+        $handler->setFormatter($formatter);
 
         $logger->pushHandler($handler);
+
+        // Same records into var/log/app-YYYY-MM-DD.log, one file per day, 14 days kept.
+        // Development: the project folder on the host. Production: the backend_logs volume.
+        $fileHandler = new RotatingFileHandler(__DIR__ . '/../var/log/app.log', 14, Level::Debug);
+        $fileHandler->setFormatter($formatter);
+
+        // A log file that cannot be written must never turn an error response into a crash
+        $logger->pushHandler(new WhatFailureGroupHandler([$fileHandler]));
+
         return $logger;
     },
 
@@ -87,7 +100,6 @@ return [
     JwtService::class => function (ContainerInterface $c): JwtService {
         /** @var Settings $s */
         $s = $c->get(Settings::class);
-
         return new JwtService($s->get('jwt.secret'), $s->get('jwt.ttl_seconds'));
     },
 
@@ -110,7 +122,6 @@ return [
     RefreshTokenRepositoryInterface::class => \DI\autowire(RefreshTokenRepository::class),
 
     // ─── Services ─────────────────────────────────────────────────
-
 
 
 ];

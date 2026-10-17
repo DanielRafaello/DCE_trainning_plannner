@@ -13,9 +13,6 @@ return function (App $app): void {
 
     $container = $app->getContainer();
 
-    // ─── Security headers ──────────────────────────────────────────
-    $app->add(new SecurityHeadersMiddleware());
-
     // ─── Error handler – single instance shared with the rate limiter ─────
     $errorHandler = new HttpErrorHandler(
         $app->getCallableResolver(),
@@ -44,6 +41,10 @@ return function (App $app): void {
         logErrorDetails: true,
     );
     $errorMiddleware->setDefaultErrorHandler($errorHandler);
+
+    // ─── Security headers – outside the error middleware, so error ──
+    // responses (422, 401, 429, 500...) get them too, not just successful ones
+    $app->add(new SecurityHeadersMiddleware());
 
     // ─── CORS – added last so it's the outermost layer, wrapping even ───
     // thrown exceptions the error middleware catches (an error response

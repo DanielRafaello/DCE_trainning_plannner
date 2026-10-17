@@ -32,7 +32,6 @@ final readonly class RegisterAction
             password:    $data['password'],
         );
 
-//        return $this->responder
-        //todo
+        return $this->responder->respond($response, $result['token'], $result['refresh_token'], $result['user'], 201);
     }
 }

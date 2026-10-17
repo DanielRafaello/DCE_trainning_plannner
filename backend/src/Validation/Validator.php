@@ -120,6 +120,8 @@ class Validator
             'min'       => strlen($str) >= (int) $param,
             'max'       => strlen($str) <= (int) $param,
             'numeric'   => is_numeric($str),
+            'integer'   => $str === '' || filter_var($str, FILTER_VALIDATE_INT) !== false,
+            'between'   => $this->isBetween($str, $param),
             'in'        => in_array($str, explode(',', $param ?? ''), true),
             'same'      => $str === trim((string) ($this->data[$param ?? ''] ?? '')),
             'confirmed' => $str === trim((string) ($this->data[$field . '_confirm'] ?? '')),
@@ -134,6 +136,19 @@ class Validator
         return $pass;
     }
 
+    private function isBetween(string $value, ?string $parameters): bool
+    {
+        if (!is_numeric($value) || $parameters === null) {
+            return false;
+        }
+
+        [$minimum, $maximum] = array_pad(explode(',', $parameters, 2), 2, null);
+        if (!is_numeric($minimum) || !is_numeric($maximum)) {
+            return false;
+        }
+
+        return (float) $value >= (float) $minimum && (float) $value <= (float) $maximum;
+    }
     /**
      * Accepts any string PHP's date parser understands (ISO 8601 with or
      * without time/offset, "Y-m-d\TH:i" from datetime-local inputs, etc.) —
@@ -177,6 +192,8 @@ class Validator
             'min'       => "{$label} must be at least {$param} characters.",
             'max'       => "{$label} may not exceed {$param} characters.",
             'numeric'   => "{$label} must be a number.",
+            'integer'   => "{$label} must be a whole number.",
+            'between'   => "{$label} must be between " . str_replace(',', ' and ', (string) $param) . '.',
             'in'        => "{$label} must be one of: {$param}.",
             'same'      => "{$label} must match {$param}.",
             'confirmed' => "{$label} confirmation does not match.",

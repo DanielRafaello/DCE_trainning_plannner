@@ -40,7 +40,15 @@
         "test:int": "./vendor/bin/pest tests/Integration",
         "test:cover": "XDEBUG_MODE=coverage ./vendor/bin/pest --coverage",
         "migrate": "doctrine-migrations migrate",
-        "migrate:generate": "doctrine-migrations generate"
+        "migrate:generate": "doctrine-migrations generate",
+        "migrate:reset": "doctrine-migrations migrate first --no-interaction",
+        "db:seed": "php bin/seed.php",
+        "db:truncate": "php bin/truncate.php",
+        "db:fresh": [
+            "@migrate:reset",
+            "doctrine-migrations migrate --no-interaction",
+            "@db:seed"
+        ]
     },
     "config": {
         "allow-plugins": {

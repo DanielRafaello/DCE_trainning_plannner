@@ -11,7 +11,7 @@ return [
         'execution_time_column_name' => 'execution_time',
     ],
     'migrations_paths' => [
-        'App\\Migrations' => 'migrations',
+        'App\\Migrations\\Migrations' => 'migrations/Migrations',
     ],
     'all_or_nothing'         => true,
     'transactional'          => true,

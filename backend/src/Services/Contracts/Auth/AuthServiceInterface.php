@@ -37,12 +37,4 @@ interface AuthServiceInterface
 
     public function currentUser(int $userId): User;
 
-    /**
-     * Issues a fresh access + refresh token pair for an already-resolved user —
-     * for flows that authenticate a user outside login/register (e.g. accepting
-     * an employee invite) without duplicating token-issuance logic.
-     *
-     * @return array{token: string, refresh_token: string}
-     */
-    public function issueTokensFor(User $user): array;
 }

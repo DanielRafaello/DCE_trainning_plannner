@@ -3,11 +3,12 @@
 namespace App\Repositories;
 
 use App\Repositories\Contracts\RefreshTokenRepositoryInterface;
+use Doctrine\DBAL\Connection;
 
-final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
+final readonly class RefreshTokenRepository implements RefreshTokenRepositoryInterface
 {
     public function __construct(
-        private readonly Connection $connection,
+        private Connection $connection,
     ) {
     }
 

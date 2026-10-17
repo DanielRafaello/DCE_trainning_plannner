@@ -5,7 +5,7 @@ declare(strict_types=1);
 use DI\ContainerBuilder;
 use Slim\Factory\AppFactory;
 
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../', ['.env', '.env.development']);
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../', ['.env.development', '.env',]);
 $dotenv->load();
 
 // ─── PHP-DI Container ─────────────────────────────────────────────

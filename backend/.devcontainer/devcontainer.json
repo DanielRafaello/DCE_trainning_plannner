@@ -2,6 +2,7 @@
     "name": "DCE schedule application planner Backend (PHP)",
     "dockerComposeFile": "../../docker-compose.yml",
     "service": "backend",
-    "workspaceFolder": "/app"
-
+    "workspaceFolder": "/app",
+    // keep the image's CMD (apache2-foreground) instead of replacing it with a sleep loop
+    "overrideCommand": false
 }

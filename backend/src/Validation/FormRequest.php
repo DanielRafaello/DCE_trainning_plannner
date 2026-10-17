@@ -32,8 +32,9 @@ abstract class FormRequest
 {
     private readonly Validator $validator;
 
-    public function __construct(private readonly array $data)
+    public function __construct(private array $data)
     {
+        $this->data = $this->sanitize($data);
         $this->validator = Validator::make($data, $this->rules(), $this->messages());
     }
 
@@ -96,5 +97,28 @@ abstract class FormRequest
     public function __get(string $name): mixed
     {
         return $this->data[$name] ?? null;
+    }
+
+    /**
+     * Recursively traverses all data and trims whitespaces from strings.
+     * Optionally, you can convert empty strings directly to null here.
+     */
+    private function sanitize(array $data): array
+    {
+        $sanitized = [];
+
+        foreach ($data as $key => $value) {
+            if (is_string($value)) {
+                $trimmed = trim($value);
+                // Often useful: $sanitized[$key] = $trimmed === '' ? null : $trimmed;
+                $sanitized[$key] = $trimmed;
+            } elseif (is_array($value)) {
+                $sanitized[$key] = $this->sanitize($value); //recursion
+            } else {
+                $sanitized[$key] = $value;
+            }
+        }
+
+        return $sanitized;
     }
 }
