@@ -15,6 +15,8 @@ final readonly class User
         public string $email,
         public string $name,
         public Role $role,
+        public string $timezone,
+        public ?string $blockedAt,
         public string $createdAt,
     ) {
     }
@@ -27,7 +29,14 @@ final readonly class User
             email:     $row['email'],
             name:      $row['name'],
             role:      Role::from($row['role']),
+            timezone:  $row['timezone'],
+            blockedAt: $row['blocked_at'],
             createdAt: $row['created_at'],
         );
+    }
+
+    public function isBlocked(): bool
+    {
+        return $this->blockedAt !== null;
     }
 }
