@@ -9,6 +9,10 @@ namespace App\Domain;
  */
 final readonly class TodoList
 {
+    /** Title length in characters (FR-TO DO-01) – matches VARCHAR(100) on todo_lists.title */
+    public const int TITLE_MIN_LENGTH = 1;
+    public const int TITLE_MAX_LENGTH = 100;
+
     public function __construct(
         public int $id,
         public int $userId,

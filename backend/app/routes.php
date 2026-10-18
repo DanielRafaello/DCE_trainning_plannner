@@ -15,6 +15,11 @@ use App\Action\Subcategory\CreateSubcategoryAction;
 use App\Action\Subcategory\DeleteSubcategoryAction;
 use App\Action\Subcategory\ListSubcategoriesAction;
 use App\Action\Subcategory\UpdateSubcategoryAction;
+use App\Action\TodoList\CreateTodoListAction;
+use App\Action\TodoList\DeleteTodoListAction;
+use App\Action\TodoList\GetTodoListAction;
+use App\Action\TodoList\ListTodoListsAction;
+use App\Action\TodoList\UpdateTodoListAction;
 use App\Action\User\ChangePasswordAction;
 use App\Action\User\DeleteAccountAction;
 use App\Action\User\MeAction;
@@ -55,6 +60,15 @@ return function (App $app): void {
         $group->delete('/{id:[0-9]+}', DeleteSubcategoryAction::class);
     })->add(JwtAuthMiddleware::class);
 
+    // ─── To-do lists (JWT) ─────────────────────────
+    $app->group('/todo-lists', function (RouteCollectorProxy $group): void {
+
+        $group->get('', ListTodoListsAction::class);
+        $group->post('', CreateTodoListAction::class);
+        $group->get('/{id:[0-9]+}', GetTodoListAction::class);
+        $group->patch('/{id:[0-9]+}', UpdateTodoListAction::class);
+        $group->delete('/{id:[0-9]+}', DeleteTodoListAction::class);
+    })->add(JwtAuthMiddleware::class);
 
     // ─── Day notes (JWT) ─────────────────────────
     // the pattern only checks the shape, DayNoteService rejects impossible dates (2026-02-30)
