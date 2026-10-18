@@ -16,8 +16,6 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 
 final readonly class SubcategoryService implements SubcategoryServiceInterface
 {
-    private const int NAME_MAX_LENGTH = 100;
-
     // FR-SUB-03a: colors assigned when the client sends none, in this order
     private const array DEFAULT_PALETTE = [
         '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4',
@@ -118,7 +116,7 @@ final readonly class SubcategoryService implements SubcategoryServiceInterface
         $name   = trim($name);
         $length = mb_strlen($name);
 
-        if ($length === 0 || $length > self::NAME_MAX_LENGTH) {
+        if ($length < Subcategory::NAME_MIN_LENGTH || $length > Subcategory::NAME_MAX_LENGTH) {
             throw new ValidationException(['name' => 'subcategory.name_length']);
         }
 

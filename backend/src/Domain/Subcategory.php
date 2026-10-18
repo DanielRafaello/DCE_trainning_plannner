@@ -12,6 +12,10 @@ final readonly class Subcategory
     /** `#RRGGBB` (FR-SUB-03a) – the same rule as the CHECK constraint on subcategories.color */
     public const string COLOR_PATTERN = '/^#[0-9A-Fa-f]{6}$/';
 
+    /** Name length in characters (FR-SUB-03) – matches VARCHAR(100) on subcategories.name */
+    public const int NAME_MIN_LENGTH = 1;
+    public const int NAME_MAX_LENGTH = 100;
+
     public function __construct(
         public int $id,
         public int $userId,
