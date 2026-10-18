@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Middleware\CorsMiddleware;
 use App\Repositories\CategoryRepository;
 use App\Repositories\Contracts\CategoryRepositoryInterface;
+use App\Repositories\Contracts\DayNoteRepositoryInterface;
 use App\Repositories\Contracts\RefreshTokenRepositoryInterface;
 use App\Repositories\Contracts\StatisticsRepositoryInterface;
 use App\Repositories\Contracts\SubcategoryRepositoryInterface;
