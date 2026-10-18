@@ -8,6 +8,7 @@ use App\Action\Auth\LoginAction;
 use App\Action\Auth\LogoutAction;
 use App\Action\Auth\RefreshAction;
 use App\Action\Auth\RegisterAction;
+use App\Action\Category\ListCategoriesAction;
 use App\Action\User\MeAction;
 use App\Middleware\JwtAuthMiddleware;
 use Slim\App;
@@ -23,6 +24,10 @@ return function (App $app): void {
 
     // JwtAuthMiddleware is added last -> runs first (outermost), so it
     $app->get('/me', MeAction::class)
+        ->add(JwtAuthMiddleware::class);
+
+    // ─── Categories (JWT) ─────────────────────────
+    $app->get('/categories', ListCategoriesAction::class)
         ->add(JwtAuthMiddleware::class);
 
 };
