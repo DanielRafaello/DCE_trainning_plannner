@@ -20,7 +20,11 @@ use App\Repositories\SubcategoryRepository;
 use App\Repositories\TodoListRepository;
 use App\Repositories\UserRepository;
 use App\Services\Auth\AuthService;
+use App\Services\Category\CategoryService;
 use App\Services\Contracts\Auth\AuthServiceInterface;
+use App\Services\Contracts\Category\CategoryServiceInterface;
+use App\Services\Contracts\Subcategory\SubcategoryServiceInterface;
+use App\Services\Subcategory\SubcategoryService;
 use App\Services\JWT\JwtService;
 use App\Settings\Settings;
 use App\Settings\SettingsFactory;
@@ -140,6 +144,7 @@ return [
     StatisticsRepositoryInterface::class   => \DI\autowire(StatisticsRepository::class),
 
     // ─── Services ─────────────────────────────────────────────────
-
+    CategoryServiceInterface::class        => \DI\autowire(CategoryService::class),
+    SubcategoryServiceInterface::class     => \DI\autowire(SubcategoryService::class),
 
 ];
