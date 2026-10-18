@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 
 // ─── Routes ───────────────────────────────────────────────────
+use App\Action\Admin\ListUsersAction;
+use App\Action\Admin\UpdateUserAction;
 use App\Action\Auth\LoginAction;
 use App\Action\Auth\LogoutAction;
 use App\Action\Auth\RefreshAction;
@@ -11,6 +13,14 @@ use App\Action\Auth\RegisterAction;
 use App\Action\Category\ListCategoriesAction;
 use App\Action\DayNote\GetDayNoteAction;
 use App\Action\DayNote\SaveDayNoteAction;
+use App\Action\Event\CreateEventAction;
+use App\Action\Event\DeleteEventAction;
+use App\Action\Event\GetEventAction;
+use App\Action\Event\ListEventsAction;
+use App\Action\Event\UpdateEventAction;
+use App\Action\Statistics\CategoryStatisticsAction;
+use App\Action\Statistics\SubcategoryStatisticsAction;
+use App\Action\Statistics\TimelineStatisticsAction;
 use App\Action\Subcategory\CreateSubcategoryAction;
 use App\Action\Subcategory\DeleteSubcategoryAction;
 use App\Action\Subcategory\ListSubcategoriesAction;
@@ -24,6 +34,8 @@ use App\Action\User\ChangePasswordAction;
 use App\Action\User\DeleteAccountAction;
 use App\Action\User\MeAction;
 use App\Action\User\UpdateProfileAction;
+use App\Action\Week\GetWeekAction;
+use App\Middleware\AdminOnlyMiddleware;
 use App\Middleware\JwtAuthMiddleware;
 use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
@@ -77,5 +89,37 @@ return function (App $app): void {
         $group->get('/note', GetDayNoteAction::class);
         $group->put('/note', SaveDayNoteAction::class);
     })->add(JwtAuthMiddleware::class);
+
+    // ─── Week (JWT) ─────────────────────────
+    // {date} is `2026-10-18` or `2026-W42`, WeekService validates it
+    $app->get('/weeks/{date}', GetWeekAction::class)
+        ->add(JwtAuthMiddleware::class);
+
+    // ─── Events (JWT) ─────────────────────────
+    $app->group('/events', function (RouteCollectorProxy $group): void {
+
+        $group->get('', ListEventsAction::class);
+        $group->post('', CreateEventAction::class);
+        $group->get('/{id:[0-9]+}', GetEventAction::class);
+        $group->patch('/{id:[0-9]+}', UpdateEventAction::class);
+        $group->delete('/{id:[0-9]+}', DeleteEventAction::class);
+    })->add(JwtAuthMiddleware::class);
+
+    // ─── Statistics (JWT) ─────────────────────────
+    $app->group('/stats', function (RouteCollectorProxy $group): void {
+
+        $group->get('/categories', CategoryStatisticsAction::class);
+        $group->get('/subcategories', SubcategoryStatisticsAction::class);
+        $group->get('/timeline', TimelineStatisticsAction::class);
+    })->add(JwtAuthMiddleware::class);
+
+    // ─── Administration (JWT + admin) ─────────────────────────
+    // AdminOnlyMiddleware reads the role set by JwtAuthMiddleware, so JWT is added last (runs first)
+    $app->group('/admin', function (RouteCollectorProxy $group): void {
+
+        $group->get('/users', ListUsersAction::class);
+        $group->patch('/users/{id:[0-9]+}', UpdateUserAction::class);
+    })  ->add(AdminOnlyMiddleware::class)
+        ->add(JwtAuthMiddleware::class);
 
 };
