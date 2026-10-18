@@ -10,6 +10,7 @@ use App\Repositories\Contracts\StatisticsRepositoryInterface;
 use App\Repositories\Contracts\SubcategoryRepositoryInterface;
 use App\Repositories\Contracts\TodoListRepositoryInterface;
 use App\Repositories\Contracts\UserRepositoryInterface;
+use App\Repositories\DayNoteRepository;
 use App\Repositories\RefreshTokenRepository;
 use App\Repositories\StatisticsRepository;
 use App\Repositories\SubcategoryRepository;
@@ -130,6 +131,7 @@ return [
     RefreshTokenRepositoryInterface::class => \DI\autowire(RefreshTokenRepository::class),
     CategoryRepositoryInterface::class     => \DI\autowire(CategoryRepository::class),
     SubcategoryRepositoryInterface::class  => \DI\autowire(SubcategoryRepository::class),
+    DayNoteRepositoryInterface::class      => \DI\autowire(DayNoteRepository::class),
     TodoListRepositoryInterface::class     => \DI\autowire(TodoListRepository::class),
     StatisticsRepositoryInterface::class   => \DI\autowire(StatisticsRepository::class),
 
