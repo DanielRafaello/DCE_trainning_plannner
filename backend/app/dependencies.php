@@ -6,10 +6,12 @@ use App\Middleware\CorsMiddleware;
 use App\Repositories\CategoryRepository;
 use App\Repositories\Contracts\CategoryRepositoryInterface;
 use App\Repositories\Contracts\RefreshTokenRepositoryInterface;
+use App\Repositories\Contracts\StatisticsRepositoryInterface;
 use App\Repositories\Contracts\SubcategoryRepositoryInterface;
 use App\Repositories\Contracts\TodoListRepositoryInterface;
 use App\Repositories\Contracts\UserRepositoryInterface;
 use App\Repositories\RefreshTokenRepository;
+use App\Repositories\StatisticsRepository;
 use App\Repositories\SubcategoryRepository;
 use App\Repositories\TodoListRepository;
 use App\Repositories\UserRepository;
@@ -129,6 +131,7 @@ return [
     CategoryRepositoryInterface::class     => \DI\autowire(CategoryRepository::class),
     SubcategoryRepositoryInterface::class  => \DI\autowire(SubcategoryRepository::class),
     TodoListRepositoryInterface::class     => \DI\autowire(TodoListRepository::class),
+    StatisticsRepositoryInterface::class   => \DI\autowire(StatisticsRepository::class),
 
     // ─── Services ─────────────────────────────────────────────────
 
