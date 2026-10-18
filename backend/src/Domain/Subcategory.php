@@ -9,6 +9,9 @@ namespace App\Domain;
  */
 final readonly class Subcategory
 {
+    /** `#RRGGBB` (FR-SUB-03a) – the same rule as the CHECK constraint on subcategories.color */
+    public const string COLOR_PATTERN = '/^#[0-9A-Fa-f]{6}$/';
+
     public function __construct(
         public int $id,
         public int $userId,

@@ -18,8 +18,6 @@ final readonly class SubcategoryService implements SubcategoryServiceInterface
 {
     private const int NAME_MAX_LENGTH = 100;
 
-    private const string COLOR_PATTERN = '/^#[0-9a-f]{6}$/';
-
     // FR-SUB-03a: colors assigned when the client sends none, in this order
     private const array DEFAULT_PALETTE = [
         '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4',
@@ -132,7 +130,7 @@ final readonly class SubcategoryService implements SubcategoryServiceInterface
     {
         $color = strtolower(trim($color));
 
-        if (preg_match(self::COLOR_PATTERN, $color) !== 1) {
+        if (preg_match(Subcategory::COLOR_PATTERN, $color) !== 1) {
             throw new ValidationException(['color' => 'subcategory.color_format']);
         }
 
