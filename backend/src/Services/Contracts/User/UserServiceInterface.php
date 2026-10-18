@@ -16,7 +16,7 @@ use App\Exceptions\Validation\ValidationException;
 interface UserServiceInterface
 {
     /**
-     * Updates name, email and timezone (FR-AUTH-08).
+     * Updates name, email and/or timezone (FR-AUTH-08, `PATCH /me`). Null keeps the current value.
      *
      * - The email is trimmed and lower-cased before it is stored.
      * - The email must not belong to another user (case-insensitive).
@@ -26,7 +26,12 @@ interface UserServiceInterface
      * @throws NotFoundException  the user no longer exists
      * @throws ValidationException the email is already taken (`email` field error) or the timezone is invalid
      */
-    public function updateProfile(int $userId, string $name, string $email, string $timezone): User;
+    public function updateProfile(
+        int $userId,
+        ?string $name = null,
+        ?string $email = null,
+        ?string $timezone = null,
+    ): User;
 
     /**
      * Changes the password (FR-AUTH-09).

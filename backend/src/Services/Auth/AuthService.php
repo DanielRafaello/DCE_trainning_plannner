@@ -106,6 +106,12 @@ class AuthService implements AuthServiceInterface
         return $this->users->findById($userId) ?? throw new NotFoundException('not.found.user');
     }
 
+    /** @return array{token: string, refresh_token: string} */
+    public function issueTokens(User $user): array
+    {
+        return $this->issueTokensFor($user);
+    }
+
     /**
      * Issues a fresh access + refresh token pair for an already-resolved user —
      * for flows that authenticate a user outside login/register (e.g. accepting

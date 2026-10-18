@@ -113,6 +113,14 @@ final readonly class UserRepository implements UserRepositoryInterface
         );
     }
 
+    public function countByRole(Role $role): int
+    {
+        return (int) $this->connection->fetchOne(
+            'SELECT count(*) FROM users WHERE role = ?',
+            [$role->value],
+        );
+    }
+
     public function updateRole(int $id, Role $role): ?User
     {
         $row = $this->connection->fetchAssociative(

@@ -20,6 +20,7 @@ interface RefreshTokenRepositoryInterface
     /**
      * delete all token for specific user
      * USE IF USER TRIES TO USE OLD REFRESH TOKEN EXPIRED ALREADY -> hacker maybe tried to use refresh token of someone else to get new tokens
+     * USE IN CASE OF CHANGE OF PASSWORD
      */
     public function revokeAllForUser(int $userId): void;
 

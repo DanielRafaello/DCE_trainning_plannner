@@ -24,7 +24,9 @@ use App\Services\Category\CategoryService;
 use App\Services\Contracts\Auth\AuthServiceInterface;
 use App\Services\Contracts\Category\CategoryServiceInterface;
 use App\Services\Contracts\Subcategory\SubcategoryServiceInterface;
+use App\Services\Contracts\User\UserServiceInterface;
 use App\Services\Subcategory\SubcategoryService;
+use App\Services\User\UserService;
 use App\Services\JWT\JwtService;
 use App\Settings\Settings;
 use App\Settings\SettingsFactory;
@@ -146,5 +148,6 @@ return [
     // ─── Services ─────────────────────────────────────────────────
     CategoryServiceInterface::class        => \DI\autowire(CategoryService::class),
     SubcategoryServiceInterface::class     => \DI\autowire(SubcategoryService::class),
+    UserServiceInterface::class            => \DI\autowire(UserService::class),
 
 ];

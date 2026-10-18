@@ -16,8 +16,14 @@ final class MeResponder extends JsonResponder
                 'name'       => $user->name,
                 'email'      => $user->email,
                 'role'       => $user->role->value,
+                'timezone'   => $user->timezone,
                 'created_at' => $user->createdAt,
             ],
         ]);
+    }
+
+    public function deleted(Response $response): Response
+    {
+        return $response->withStatus(204);
     }
 }

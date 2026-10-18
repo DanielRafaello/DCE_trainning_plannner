@@ -49,6 +49,9 @@ interface UserRepositoryInterface
     /** Total for paginate() with the same search. */
     public function count(?string $search): int;
 
+    /** Number of users with the role – e.g. "is this the last admin?" (FR-AUTH-10, FR-ADM-*). */
+    public function countByRole(Role $role): int;
+
     public function updateRole(int $id, Role $role): ?User;
 
     /** Blocks (blocked_at = now()) or unblocks (blocked_at = NULL) a user. */

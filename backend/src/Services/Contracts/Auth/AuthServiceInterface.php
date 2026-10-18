@@ -37,4 +37,12 @@ interface AuthServiceInterface
 
     public function currentUser(int $userId): User;
 
+    /**
+     * Issues a fresh access + refresh token pair for an already authenticated user –
+     * for flows outside login/register, e.g. after a password change (FR-AUTH-09).
+     *
+     * @return array{token: string, refresh_token: string}
+     */
+    public function issueTokens(User $user): array;
+
 }
