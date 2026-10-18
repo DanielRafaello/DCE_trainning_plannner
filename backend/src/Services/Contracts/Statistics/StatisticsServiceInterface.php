@@ -7,41 +7,47 @@ namespace App\Services\Contracts\Statistics;
 use App\Domain\EventStatus;
 use App\Domain\StatsGranularity;
 use App\Exceptions\Validation\ValidationException;
+use App\ReadModel\Statistics\CategoryStatistics;
+use App\ReadModel\Statistics\SubcategoryStatistics;
+use App\ReadModel\Statistics\TimelineBucket;
 use DateTimeImmutable;
 
 /**
  * Statistics over categories and subcategories (FR-STAT-*). Baseline only – detailed statistics
- * will be specified later, so the return shapes may grow (new keys), but existing keys stay.
+ * will be specified later, so the read models may grow, but existing fields stay.
  *
  * Common rules for every method:
  * - The period is [from, to). The frontend sends ready ranges (week, month, year or custom, FR-STAT-01);
  *   the service only checks that `to` > `from` and that the period is at most 5 years.
  * - Only the part of an event inside the period counts (FR-STAT-06).
- * - $statuses filters events; empty = the default, which is `done` only – what actually happened (FR-STAT-04).
- * - All 9 categories are always present in category results, with zeros when there are no events,
- *   so charts have a stable shape.
  * - Times are in whole minutes.
+ *
+ * Statuses: byCategory() and bySubcategory() always return totals split by status (StatusTotals),
+ * which covers both "what actually happened" – `done` only, the default view (FR-STAT-04) – and
+ * plan vs. reality – done vs. skipped with completion rates (FR-STAT-07). No status filter is needed there.
  */
 interface StatisticsServiceInterface
 {
     /**
-     * Totals per category (FR-STAT-02).
+     * Totals per category (FR-STAT-02, FR-STAT-07).
+     * All 9 categories are always present, in category order, with zeros when there are no events,
+     * so charts have a stable shape.
      *
-     * @param list<EventStatus> $statuses
-     * @return list<array{category_id: int, slug: string, minutes: int, event_count: int}> in category order
+     * @return list<CategoryStatistics>
      *
      * @throws ValidationException invalid period
      */
-    public function byCategory(int $userId, DateTimeImmutable $from, DateTimeImmutable $to, array $statuses = []): array;
+    public function byCategory(int $userId, DateTimeImmutable $from, DateTimeImmutable $to): array;
 
     /**
-     * Totals per subcategory (FR-STAT-03). Events without a subcategory are reported as one extra
-     * row per category with `subcategory_id: null` ("unassigned"). Subcategories with no events
-     * in the period are included with zeros.
+     * Totals per subcategory (FR-STAT-03), grouped by category in category order.
      *
-     * @param int|null          $categoryId only this category; null = all
-     * @param list<EventStatus> $statuses
-     * @return list<array{category_id: int, subcategory_id: ?int, name: ?string, color: ?string, minutes: int, event_count: int}>
+     * - Every subcategory of the user is present, with zeros when it has no events in the period.
+     * - Events without a subcategory form one extra "unassigned" row per category
+     *   (SubcategoryStatistics::$subcategory = null), only when there are such events.
+     *
+     * @param int|null $categoryId only this category; null = all
+     * @return list<SubcategoryStatistics>
      *
      * @throws ValidationException invalid period or unknown category
      */
@@ -50,31 +56,14 @@ interface StatisticsServiceInterface
         DateTimeImmutable $from,
         DateTimeImmutable $to,
         ?int $categoryId = null,
-        array $statuses = [],
     ): array;
-
-    /**
-     * Plan vs. reality per category (FR-STAT-07): what was done and what was skipped.
-     * `completion_rate` = done / (done + skipped), by count and by minutes, as 0–1;
-     * null when there is nothing done or skipped. `planned` events are ignored – they have not happened yet.
-     *
-     * @return list<array{
-     *     category_id: int, slug: string,
-     *     done_minutes: int, done_count: int, skipped_minutes: int, skipped_count: int,
-     *     completion_rate_count: ?float, completion_rate_minutes: ?float
-     * }>
-     *
-     * @throws ValidationException invalid period
-     */
-    public function planVsReality(int $userId, DateTimeImmutable $from, DateTimeImmutable $to): array;
 
     /**
      * Time series for charts (FR-STAT-05): minutes per category in day/week/month buckets, computed in
      * the user's timezone. Every bucket of the period is present (also empty ones), each with all categories.
      *
-     * @param list<EventStatus> $statuses
-     * @return list<array{bucket: string, categories: array<int, int>}> bucket = local start date `Y-m-d`,
-     *         categories = category_id => minutes
+     * @param list<EventStatus> $statuses empty = the default, `done` only
+     * @return list<TimelineBucket> in chronological order
      *
      * @throws ValidationException invalid period, or too many buckets (more than 400, e.g. days over 5 years)
      */

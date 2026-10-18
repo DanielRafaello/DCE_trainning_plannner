@@ -4,6 +4,9 @@ namespace App\Repositories;
 
 use App\Domain\EventStatus;
 use App\Domain\StatsGranularity;
+use App\ReadModel\Statistics\CategoryTotals;
+use App\ReadModel\Statistics\SubcategoryTotals;
+use App\ReadModel\Statistics\TimelinePoint;
 use App\Repositories\Contracts\StatisticsRepositoryInterface;
 use DateTimeImmutable;
 use Doctrine\DBAL\ArrayParameterType;
@@ -20,54 +23,50 @@ final readonly class StatisticsRepository implements StatisticsRepositoryInterfa
           AND e.start_at < CAST(:to AS TIMESTAMPTZ) AND e.end_at > CAST(:from AS TIMESTAMPTZ)
           AND e.start_at > CAST(:from AS TIMESTAMPTZ) - INTERVAL \'24 hours\'';
 
-    // minutes of the event clipped to the period (FR-STAT-06)
-    private const string CLIPPED_MINUTES = 'ROUND(SUM(EXTRACT(EPOCH FROM
-          LEAST(e.end_at, CAST(:to AS TIMESTAMPTZ)) - GREATEST(e.start_at, CAST(:from AS TIMESTAMPTZ))
-        )) / 60)::INT';
+    // the user's events in the period, each with its duration clipped to the period in seconds (FR-STAT-06)
+    private const string CLIPPED_EVENTS = 'SELECT e.category_id, e.subcategory_id, e.status,
+               EXTRACT(EPOCH FROM
+                   LEAST(e.end_at, CAST(:to AS TIMESTAMPTZ)) - GREATEST(e.start_at, CAST(:from AS TIMESTAMPTZ))
+               ) AS seconds
+        FROM events e
+        WHERE ' . self::PERIOD_CONDITION;
+
+    // one column pair per status – the shape StatusTotals::fromRow() reads
+    private const string STATUS_TOTALS = '
+        count(*) FILTER (WHERE status = \'planned\') AS planned_count,
+        COALESCE(ROUND(SUM(seconds) FILTER (WHERE status = \'planned\') / 60), 0)::INT AS planned_minutes,
+        count(*) FILTER (WHERE status = \'done\') AS done_count,
+        COALESCE(ROUND(SUM(seconds) FILTER (WHERE status = \'done\') / 60), 0)::INT AS done_minutes,
+        count(*) FILTER (WHERE status = \'skipped\') AS skipped_count,
+        COALESCE(ROUND(SUM(seconds) FILTER (WHERE status = \'skipped\') / 60), 0)::INT AS skipped_minutes';
 
     public function __construct(
         private Connection $connection,
     ) {
     }
 
-    /**
-     * @param list<EventStatus> $statuses
-     * @return list<array{category_id: int, status: string, minutes: int, event_count: int}>
-     */
-    public function sumByCategory(int $userId, DateTimeImmutable $from, DateTimeImmutable $to, array $statuses = []): array
+    /** @return list<CategoryTotals> */
+    public function sumByCategory(int $userId, DateTimeImmutable $from, DateTimeImmutable $to): array
     {
-        [$statusSql, $params, $types] = $this->baseParams($userId, $from, $to, $statuses);
-
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT e.category_id, e.status, ' . self::CLIPPED_MINUTES . ' AS minutes, count(*) AS event_count
-             FROM events e
-             WHERE ' . self::PERIOD_CONDITION . $statusSql . '
-             GROUP BY e.category_id, e.status
-             ORDER BY e.category_id, e.status',
-            $params,
-            $types,
+            'SELECT category_id, ' . self::STATUS_TOTALS . '
+             FROM (' . self::CLIPPED_EVENTS . ') clipped
+             GROUP BY category_id
+             ORDER BY category_id',
+            $this->periodParams($userId, $from, $to),
         );
 
-        return array_map(static fn (array $r) => [
-            'category_id' => (int) $r['category_id'],
-            'status'      => $r['status'],
-            'minutes'     => (int) $r['minutes'],
-            'event_count' => (int) $r['event_count'],
-        ], $rows);
+        return array_map(CategoryTotals::fromRow(...), $rows);
     }
 
-    /**
-     * @param list<EventStatus> $statuses
-     * @return list<array{category_id: int, subcategory_id: ?int, status: string, minutes: int, event_count: int}>
-     */
+    /** @return list<SubcategoryTotals> */
     public function sumBySubcategory(
         int $userId,
         DateTimeImmutable $from,
         DateTimeImmutable $to,
         ?int $categoryId = null,
-        array $statuses = [],
     ): array {
-        [$statusSql, $params, $types] = $this->baseParams($userId, $from, $to, $statuses);
+        $params = $this->periodParams($userId, $from, $to);
 
         $categorySql = '';
         if ($categoryId !== null) {
@@ -76,28 +75,19 @@ final readonly class StatisticsRepository implements StatisticsRepositoryInterfa
         }
 
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT e.category_id, e.subcategory_id, e.status,
-                    ' . self::CLIPPED_MINUTES . ' AS minutes, count(*) AS event_count
-             FROM events e
-             WHERE ' . self::PERIOD_CONDITION . $statusSql . $categorySql . '
-             GROUP BY e.category_id, e.subcategory_id, e.status
-             ORDER BY e.category_id, e.subcategory_id NULLS LAST, e.status',
+            'SELECT category_id, subcategory_id, ' . self::STATUS_TOTALS . '
+             FROM (' . self::CLIPPED_EVENTS . $categorySql . ') clipped
+             GROUP BY category_id, subcategory_id
+             ORDER BY category_id, subcategory_id NULLS LAST',
             $params,
-            $types,
         );
 
-        return array_map(static fn (array $r) => [
-            'category_id'    => (int) $r['category_id'],
-            'subcategory_id' => $r['subcategory_id'] !== null ? (int) $r['subcategory_id'] : null,
-            'status'         => $r['status'],
-            'minutes'        => (int) $r['minutes'],
-            'event_count'    => (int) $r['event_count'],
-        ], $rows);
+        return array_map(SubcategoryTotals::fromRow(...), $rows);
     }
 
     /**
      * @param list<EventStatus> $statuses
-     * @return list<array{bucket: string, category_id: int, minutes: int}>
+     * @return list<TimelinePoint>
      */
     public function timeline(
         int $userId,
@@ -107,9 +97,17 @@ final readonly class StatisticsRepository implements StatisticsRepositoryInterfa
         string $timezone,
         array $statuses = [],
     ): array {
-        [$statusSql, $params, $types] = $this->baseParams($userId, $from, $to, $statuses);
+        $params = $this->periodParams($userId, $from, $to);
         $params['unit'] = $granularity->value;
         $params['tz'] = $timezone;
+        $types = [];
+
+        $statusSql = '';
+        if ($statuses !== []) {
+            $statusSql = ' AND e.status IN (:statuses)';
+            $params['statuses'] = array_map(static fn (EventStatus $s) => $s->value, $statuses);
+            $types['statuses'] = ArrayParameterType::STRING;
+        }
 
         // Buckets are generated as local times (timestamp without tz) and converted back with AT TIME ZONE,
         // so days stay correct across DST changes. Each event is clipped to the bucket AND to the period.
@@ -123,51 +121,38 @@ final readonly class StatisticsRepository implements StatisticsRepositoryInterfa
                      (CAST(:to AS TIMESTAMPTZ) - INTERVAL \'1 microsecond\') AT TIME ZONE :tz,
                      CAST(\'1 \' || :unit AS INTERVAL)
                  ) AS b
+             ),
+             pieces AS (
+                 SELECT bk.local_start, e.category_id,
+                        GREATEST(EXTRACT(EPOCH FROM
+                            LEAST(e.end_at, bk.bucket_end, CAST(:to AS TIMESTAMPTZ))
+                            - GREATEST(e.start_at, bk.bucket_start, CAST(:from AS TIMESTAMPTZ))
+                        ), 0) AS seconds
+                 FROM buckets bk
+                 JOIN events e ON e.start_at < bk.bucket_end AND e.end_at > bk.bucket_start
+                 WHERE ' . self::PERIOD_CONDITION . $statusSql . '
              )
-             SELECT to_char(bk.local_start, \'YYYY-MM-DD\') AS bucket,
-                    e.category_id,
-                    ROUND(SUM(GREATEST(EXTRACT(EPOCH FROM
-                        LEAST(e.end_at, bk.bucket_end, CAST(:to AS TIMESTAMPTZ))
-                        - GREATEST(e.start_at, bk.bucket_start, CAST(:from AS TIMESTAMPTZ))
-                    ), 0)) / 60)::INT AS minutes
-             FROM buckets bk
-             JOIN events e ON e.start_at < bk.bucket_end AND e.end_at > bk.bucket_start
-             WHERE ' . self::PERIOD_CONDITION . $statusSql . '
-             GROUP BY bk.local_start, e.category_id
-             HAVING SUM(GREATEST(EXTRACT(EPOCH FROM
-                        LEAST(e.end_at, bk.bucket_end, CAST(:to AS TIMESTAMPTZ))
-                        - GREATEST(e.start_at, bk.bucket_start, CAST(:from AS TIMESTAMPTZ))
-                    ), 0)) > 0
-             ORDER BY bk.local_start, e.category_id',
+             SELECT to_char(local_start, \'YYYY-MM-DD\') AS bucket,
+                    category_id,
+                    ROUND(SUM(seconds) / 60)::INT AS minutes
+             FROM pieces
+             GROUP BY local_start, category_id
+             HAVING SUM(seconds) > 0
+             ORDER BY local_start, category_id',
             $params,
             $types,
         );
 
-        return array_map(static fn (array $r) => [
-            'bucket'      => $r['bucket'],
-            'category_id' => (int) $r['category_id'],
-            'minutes'     => (int) $r['minutes'],
-        ], $rows);
+        return array_map(TimelinePoint::fromRow(...), $rows);
     }
 
-    /**
-     * @param list<EventStatus> $statuses
-     * @return array{0: string, 1: array<string, mixed>, 2: array<string, ArrayParameterType>}
-     */
-    private function baseParams(int $userId, DateTimeImmutable $from, DateTimeImmutable $to, array $statuses): array
+    /** @return array{user: int, from: string, to: string} */
+    private function periodParams(int $userId, DateTimeImmutable $from, DateTimeImmutable $to): array
     {
-        $params = [
+        return [
             'user' => $userId,
             'from' => $from->format(self::DATE_FORMAT),
             'to'   => $to->format(self::DATE_FORMAT),
         ];
-
-        if ($statuses === []) {
-            return ['', $params, []];
-        }
-
-        $params['statuses'] = array_map(static fn (EventStatus $s) => $s->value, $statuses);
-
-        return [' AND e.status IN (:statuses)', $params, ['statuses' => ArrayParameterType::STRING]];
     }
 }
