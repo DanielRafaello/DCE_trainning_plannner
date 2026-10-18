@@ -21,7 +21,10 @@ use DateTimeImmutable;
  *   }
  *
  * Supported rules:
- *   required, email, min:n, max:n, numeric, same:otherField, confirmed
+ *   required, email, min:n, max:n, numeric, same:otherField, confirmed, regex:/pattern/
+ *
+ * min/max count characters (UTF-8), not bytes.
+ * regex: the pattern must not contain "|" – it is the rule separator.
  *
  * Custom messages (overrides per field.rule):
  *   Validator::make($data, $rules, ['email.required' => 'We need your email.'])
@@ -117,8 +120,9 @@ class Validator
             'required'  => $str !== '',
             'email'     => $str === '' || (bool) filter_var($str, FILTER_VALIDATE_EMAIL),
             'url'       => $str === '' || (bool) filter_var($str, FILTER_VALIDATE_URL),
-            'min'       => strlen($str) >= (int) $param,
-            'max'       => strlen($str) <= (int) $param,
+            'min'       => mb_strlen($str) >= (int) $param,
+            'max'       => mb_strlen($str) <= (int) $param,
+            'regex'     => $str === '' || preg_match((string) $param, $str) === 1,
             'numeric'   => is_numeric($str),
             'integer'   => $str === '' || filter_var($str, FILTER_VALIDATE_INT) !== false,
             'between'   => $this->isBetween($str, $param),
@@ -198,6 +202,7 @@ class Validator
             'same'      => "{$label} must match {$param}.",
             'confirmed' => "{$label} confirmation does not match.",
             'date'      => "{$label} must be a date.",
+            'regex'     => "{$label} format is invalid.",
             default     => "{$label} is invalid.",
         };
     }
