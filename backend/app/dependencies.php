@@ -19,8 +19,10 @@ use App\Repositories\StatisticsRepository;
 use App\Repositories\SubcategoryRepository;
 use App\Repositories\TodoListRepository;
 use App\Repositories\UserRepository;
+use App\Services\Admin\AdminUserService;
 use App\Services\Auth\AuthService;
 use App\Services\Category\CategoryService;
+use App\Services\Contracts\Admin\AdminUserServiceInterface;
 use App\Services\Contracts\Auth\AuthServiceInterface;
 use App\Services\Contracts\Category\CategoryServiceInterface;
 use App\Services\Contracts\DayNote\DayNoteServiceInterface;
@@ -130,7 +132,6 @@ return [
         $s = $c->get(Settings::class);
 
         return new AuthService(
-            $c->get(Connection::class),
             $c->get(UserRepositoryInterface::class),
             $c->get(RefreshTokenRepositoryInterface::class),
             $c->get(JwtService::class),
@@ -155,5 +156,6 @@ return [
     UserServiceInterface::class            => \DI\autowire(UserService::class),
     TodoListServiceInterface::class        => \DI\autowire(TodoListService::class),
     DayNoteServiceInterface::class         => \DI\autowire(DayNoteService::class),
+    AdminUserServiceInterface::class       => \DI\autowire(AdminUserService::class),
 
 ];

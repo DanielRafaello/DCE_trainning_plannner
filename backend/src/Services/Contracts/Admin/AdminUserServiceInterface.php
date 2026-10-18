@@ -17,6 +17,8 @@ use App\Exceptions\generalExceptions\NotFoundException;
  */
 interface AdminUserServiceInterface
 {
+
+    public const int DEFAULT_PER_PAGE = 20;
     /**
      * Users ordered by id, paginated (FR-ADM-01).
      * $search is a case-insensitive substring of name or email; empty/null = everyone.
@@ -24,7 +26,7 @@ interface AdminUserServiceInterface
      *
      * @return array{items: list<User>, total: int, page: int, per_page: int}
      */
-    public function list(?string $search, int $page = 1, int $perPage = 20): array;
+    public function list(?string $search, int $page = 1, int $perPage = self::DEFAULT_PER_PAGE): array;
 
     /**
      * Changes the role of a user (FR-ADM-02).
