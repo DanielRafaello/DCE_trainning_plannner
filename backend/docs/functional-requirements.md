@@ -1,6 +1,6 @@
 # TrainingPlanner – Functional Requirements
 
-> Status: **draft** · Version: **1.0.0** · Scope: **backend (REST API)** consumed by a Vue SPA · Last updated: 2026-10-17
+> Status: **draft** · Version: **1.0.0** · Scope: **backend (REST API)** consumed by a Vue SPA · Last updated: 2026-10-18
 >
 > Features planned for later are in [roadmap-v2.0.0.md](roadmap-v2.0.0.md); unaccepted proposals are in [ideas.md](ideas.md).
 
@@ -61,7 +61,7 @@ Vue application and is out of scope of this document except where it shapes the 
 | FR-WEEK-01 | The API returns the timetable for **one week** identified by any date within it (or by ISO week, e.g. `2026-W42`). The week always starts on **Monday**. |
 | FR-WEEK-02 | The week response contains: the week range, all of the user's **events** overlapping the week, and the **day notes** for its 7 days. |
 | FR-WEEK-03 | Any week can be requested – past, current or future – without limit. |
-| FR-WEEK-04 | All dates/times in requests and responses are ISO 8601 with offset. Times are stored in UTC and the week boundaries are computed in the user's timezone. |
+| FR-WEEK-04 | All dates/times in requests and responses are ISO 8601 **with offset** (`2026-10-20T06:00:00.000Z` or `…+02:00`); a time without an offset is rejected with `422`. In query strings the value must be URL-encoded – an unencoded `+` is decoded as a space (`encodeURIComponent`, or use the `Z` form). Times are stored in UTC and the week boundaries are computed in the user's timezone. |
 
 ---
 
@@ -97,7 +97,7 @@ Vue application and is out of scope of this document except where it shapes the 
 | FR-SUB-03a | Each subcategory has a **color** (hex `#RRGGBB`). It is optional on create – if missing, the API assigns one from a default palette. The frontend uses it to color events in the timetable. |
 | FR-SUB-04 | A user can list their subcategories (all, or filtered by category). |
 | FR-SUB-05 | A user can rename a subcategory and change its color. Moving it to another category is **not** allowed (it would corrupt statistics). |
-| FR-SUB-06 | A user can delete a subcategory **only if no events reference it**. Otherwise the API returns `409 Conflict` with the number of linked events. The database enforces this too (`ON DELETE RESTRICT`). |
+| FR-SUB-06 | A user can delete a subcategory **only if no events reference it**. Otherwise the API returns `409 Conflict` with the number of linked events (`subcategory.has_events:<count>`). The database enforces this too (`fk_events_subcategory`, `ON DELETE NO ACTION` – behaves like `RESTRICT`, but still lets a user delete cascade remove events and subcategories together). |
 | FR-SUB-07 | Subcategories are managed from the user's profile in the UI; the API provides plain CRUD endpoints. |
 
 ---
@@ -149,7 +149,7 @@ Vue application and is out of scope of this document except where it shapes the 
 | FR-STAT-01 | Statistics are computed for a chosen **period**: week, month, year or a custom date range. |
 | FR-STAT-02 | For each **category**, the API returns: total time (minutes) and number of events. |
 | FR-STAT-03 | The same breakdown is available per **subcategory** (within a category, and events without a subcategory are reported as "unassigned"). |
-| FR-STAT-04 | Statistics can be restricted to one or more statuses (default: `done` only, i.e. what actually happened). |
+| FR-STAT-04 | Category and subcategory statistics always return minutes and counts **split by status** (`planned`, `done`, `skipped`), so the client can show "what actually happened" (`done`, the default view), all events, or plan vs. reality from one response – they have no status filter. The time series (FR-STAT-05) can be restricted to one or more statuses (`status=done,skipped`; default: `done` only). |
 | FR-STAT-07 | **Plan vs. reality**: for each category/subcategory in the period, the API returns minutes and counts for `done` and `skipped`, plus a completion rate = `done / (done + skipped)` (by count and by time). |
 | FR-STAT-05 | A time series is available: totals per category grouped by day / week / month within the period (for charts). |
 | FR-STAT-06 | Events crossing a period boundary count only the part inside the period. |
@@ -161,7 +161,7 @@ Vue application and is out of scope of this document except where it shapes the 
 | ID | Requirement |
 |---|---|
 | FR-ADM-01 | An admin can list users (paginated, searchable by name/email). |
-| FR-ADM-02 | An admin can change a user's role and block/unblock a user. A blocked user cannot log in or refresh tokens. |
+| FR-ADM-02 | An admin can change a user's role and block/unblock a user. A blocked user cannot log in or refresh tokens, and their existing access token is rejected immediately (`403`). A role change takes effect on the user's next request. An admin cannot demote or block themselves, and the last admin cannot be demoted. |
 | FR-ADM-03 | An admin **cannot** read other users' events, notes or to-dos (privacy). |
 
 ---
@@ -171,11 +171,11 @@ Vue application and is out of scope of this document except where it shapes the 
 | ID | Requirement |
 |---|---|
 | NFR-01 | JSON REST API; consistent error format `{ error, status, message, errors? }`; validation errors return `422` with per-field messages. |
-| NFR-02 | All endpoints except register/login/refresh require a valid access token. |
+| NFR-02 | All endpoints except register/login/refresh/logout require a valid access token. On every request the user is loaded from the database: a deleted account gets `401`, a blocked one `403`, and the current role (not the one in the token) is used for authorization. |
 | NFR-03 | Every query for user data is scoped by the authenticated user's ID (ownership enforced in the repository/service layer). |
 | NFR-04 | Rate limiting on all endpoints; stricter limits on login/register. |
 | NFR-05 | CORS restricted to the frontend origin; security headers on all responses, including error responses. |
-| NFR-06 | Passwords are hashed with Argon2id/bcrypt; refresh tokens are stored hashed. |
+| NFR-06 | Passwords are hashed with Argon2id; refresh tokens are stored hashed (SHA-256). |
 | NFR-07 | The schema is managed by Doctrine Migrations; the fixed categories are inserted by a seeder (`migrations/Seeders`), not by a migration. |
 | NFR-08 | The week endpoint responds within 200 ms for a typical week (≤ 100 events), so it needs indexes on `(user_id, start_at)`. |
 | NFR-09 | Business logic is covered by automated tests (unit tests for services/validation, integration tests for endpoints). |
@@ -211,14 +211,14 @@ todo_lists       (id, user_id FK, title, content TEXT, created_at, updated_at)
 | GET | `/categories` | CAT-03 |
 | GET / POST | `/subcategories` (`?category=`) | SUB-01, 04 |
 | PATCH / DELETE | `/subcategories/{id}` | SUB-03a, 05, 06 |
-| GET / POST | `/events` (`?from=&to=&category=&subcategory=&status=`) | EVT-01, 08 |
+| GET / POST | `/events` (`?from=&to=&category=&subcategory=&status=done,skipped`) | EVT-01, 08 |
 | GET / PATCH / DELETE | `/events/{id}` | EVT-07 |
 | GET / PUT | `/days/{date}/note` | DAY-01…03 |
 | GET / POST | `/todo-lists` | TODO-01, 03, 05 |
 | GET / PATCH / DELETE | `/todo-lists/{id}` | TODO-02…04 |
-| GET | `/stats/categories?from=&to=&status=` | STAT-01…04 |
-| GET | `/stats/subcategories?category=&from=&to=` | STAT-03 |
-| GET | `/stats/timeline?from=&to=&groupBy=day\|week\|month` | STAT-05 |
+| GET | `/stats/categories?from=&to=` | STAT-01, 02, 04, 06, 07 |
+| GET | `/stats/subcategories?from=&to=&category=` | STAT-03, 07 |
+| GET | `/stats/timeline?from=&to=&groupBy=day\|week\|month&status=` | STAT-04, 05 |
 | GET / PATCH | `/admin/users`, `/admin/users/{id}` | ADM-01, 02 |
 
 ## 14. Decisions

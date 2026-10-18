@@ -4,6 +4,8 @@ namespace App\Services\Auth;
 
 use App\Domain\Role;
 use App\Domain\User;
+use App\Exceptions\generalExceptions\ForbiddenException;
+use App\Exceptions\generalExceptions\NotFoundException;
 use App\Exceptions\generalExceptions\UnauthorizedException;
 use App\Exceptions\Validation\ValidationException;
 use App\Repositories\Contracts\RefreshTokenRepositoryInterface;
@@ -12,17 +14,14 @@ use App\Services\Contracts\Auth\AuthServiceInterface;
 use App\Services\JWT\JwtService;
 use DateTimeImmutable;
 use DateTimeInterface;
-use DI\NotFoundException;
-use Doctrine\DBAL\Connection;
 
-class AuthService implements AuthServiceInterface
+readonly class AuthService implements AuthServiceInterface
 {
     public function __construct(
-        private readonly Connection $connection,
-        private readonly UserRepositoryInterface $users,
-        private readonly RefreshTokenRepositoryInterface $refreshTokens,
-        private readonly JwtService $jwt,
-        private readonly int $refreshTtlSeconds,
+        private UserRepositoryInterface         $users,
+        private RefreshTokenRepositoryInterface $refreshTokens,
+        private JwtService                      $jwt,
+        private int                             $refreshTtlSeconds,
     ) {
     }
 
@@ -35,7 +34,7 @@ class AuthService implements AuthServiceInterface
             throw new ValidationException(['email' => 'auth.register.email_taken']);
         }
 
-        $passwordHash = password_hash($password, PASSWORD_BCRYPT);
+        $passwordHash = password_hash($password, PASSWORD_ARGON2ID);
 
         $user = $this->users->create($name, $email, $passwordHash, Role::USER);
 
@@ -54,6 +53,11 @@ class AuthService implements AuthServiceInterface
         }
 
         $user = User::fromRow($record);
+
+        // FR-ADM-02 – checked only after the password, so a blocked account is not revealed to a guesser
+        if ($user->isBlocked()) {
+            throw new ForbiddenException('auth.account_blocked');
+        }
 
         return [
             ...$this->issueTokensFor($user),
@@ -74,6 +78,14 @@ class AuthService implements AuthServiceInterface
         }
 
         $userId = (int) $record['user_id'];
+        $user   = $this->users->findById($userId) ?? throw new UnauthorizedException('not.found.user');
+
+        // FR-ADM-02 – before the reuse check: blocking revokes all tokens, so a blocked user's token
+        // would otherwise be reported as "compromised". Also covers a token issued in a race with the block.
+        if ($user->isBlocked()) {
+            $this->refreshTokens->revokeAllForUser($userId);
+            throw new ForbiddenException('auth.account_blocked');
+        }
 
         // SECURITY INTERVENTION: The token exists but was previously invalidated!
         // Someone is trying to use it again (either an attacker or a client-side network error).
@@ -87,8 +99,6 @@ class AuthService implements AuthServiceInterface
         if (new DateTimeImmutable($record['expires_at']) <= new DateTimeImmutable()) {
             throw new UnauthorizedException('invalid.expired.refresh.token');
         }
-
-        $user    = $this->users->findById($userId) ?? throw new UnauthorizedException('not.found.user');
 
         # basic scenario - token is valid. Create new one and revoke old one.
         $this->refreshTokens->revoke($tokenHash);

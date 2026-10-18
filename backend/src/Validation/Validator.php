@@ -25,6 +25,7 @@ use DateTimeImmutable;
  *
  * min/max count characters (UTF-8), not bytes.
  * regex: the pattern must not contain "|" – it is the rule separator.
+ * datetime_offset: ISO 8601 date-time WITH a timezone offset (`…Z` or `…+02:00`), e.g. from JS toISOString().
  *
  * Custom messages (overrides per field.rule):
  *   Validator::make($data, $rules, ['email.required' => 'We need your email.'])
@@ -92,8 +93,15 @@ class Validator
             $value = $this->value($field);
             $ruleList = explode('|', $ruleString);
 
+            // every rule works on one text value – an array/object (e.g. "title": []) is rejected,
+            // a (string) cast would only produce a warning and a 500
+            if (!$this->isScalarOrNull($value)) {
+                $this->errors[$field][] = $this->message($field, 'scalar', null);
+                continue;
+            }
+
             // If the field is declared nullable and the value is empty, skip all checks
-            $str = is_string($value) ? trim($value) : (string) ($value ?? '');
+            $str = $this->stringValue($value);
             if (in_array('nullable', $ruleList, true) && $str === '') {
                 continue;
             }
@@ -115,7 +123,7 @@ class Validator
 
     private function check(string $field, mixed $value, string $rule, ?string $param): bool
     {
-        $str  = is_string($value) ? trim($value) : (string) ($value ?? '');
+        $str  = $this->stringValue($value);
         $pass = match ($rule) {
             'required'  => $str !== '',
             'email'     => $str === '' || (bool) filter_var($str, FILTER_VALIDATE_EMAIL),
@@ -127,9 +135,10 @@ class Validator
             'integer'   => $str === '' || filter_var($str, FILTER_VALIDATE_INT) !== false,
             'between'   => $this->isBetween($str, $param),
             'in'        => in_array($str, explode(',', $param ?? ''), true),
-            'same'      => $str === trim((string) ($this->data[$param ?? ''] ?? '')),
-            'confirmed' => $str === trim((string) ($this->data[$field . '_confirm'] ?? '')),
+            'same'      => $str === $this->stringValue($this->data[$param ?? ''] ?? null),
+            'confirmed' => $str === $this->stringValue($this->data[$field . '_confirm'] ?? null),
             'date'      => $this->isValidDate($str),
+            'datetime_offset' => $this->isDateTimeWithOffset($str),
             default     => true,
         };
 
@@ -138,6 +147,17 @@ class Validator
         }
 
         return $pass;
+    }
+
+    private function isScalarOrNull(mixed $value): bool
+    {
+        return $value === null || is_scalar($value);
+    }
+
+    /** Trimmed text form of a value; non-scalar values (only possible for other fields) become ''. */
+    private function stringValue(mixed $value): string
+    {
+        return $this->isScalarOrNull($value) ? trim((string) $value) : '';
     }
 
     private function isBetween(string $value, ?string $parameters): bool
@@ -159,6 +179,21 @@ class Validator
      * deliberately not restricted to one format, since both HTML forms and
      * a JSON API feed this validator.
      */
+    /**
+     * Without an explicit offset the server's default timezone would silently be used,
+     * so `2026-10-18T10:00` is rejected while `2026-10-18T10:00:00.000Z` / `…+02:00` pass (FR-WEEK-04).
+     */
+    private function isDateTimeWithOffset(string $value): bool
+    {
+        if ($value === '') {
+            return true; // emptiness is the 'required' rule's job
+        }
+
+        $pattern = '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/';
+
+        return preg_match($pattern, $value) === 1 && $this->isValidDate($value);
+    }
+
     private function isValidDate(string $value): bool
     {
         if ($value === '') {
@@ -203,6 +238,8 @@ class Validator
             'confirmed' => "{$label} confirmation does not match.",
             'date'      => "{$label} must be a date.",
             'regex'     => "{$label} format is invalid.",
+            'datetime_offset' => "{$label} must be an ISO 8601 date-time with a timezone offset.",
+            'scalar'    => "{$label} must be a single value, not a list or an object.",
             default     => "{$label} is invalid.",
         };
     }

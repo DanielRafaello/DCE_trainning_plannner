@@ -14,12 +14,22 @@ final class DayNoteResponder extends JsonResponder
     public function note(Response $response, ?DayNote $note): Response
     {
         return $this->json($response, [
-            'note' => $note === null ? null : [
-                'date'       => $note->date,
-                'content'    => $note->content,
-                'created_at' => $note->createdAt,
-                'updated_at' => $note->updatedAt,
-            ],
+            'note' => $note === null ? null : $this->noteData($note),
         ]);
+    }
+
+    /**
+     * One note as JSON – also used by WeekResponder.
+     *
+     * @return array<string, mixed>
+     */
+    public function noteData(DayNote $note): array
+    {
+        return [
+            'date'       => $note->date,
+            'content'    => $note->content,
+            'created_at' => $note->createdAt,
+            'updated_at' => $note->updatedAt,
+        ];
     }
 }

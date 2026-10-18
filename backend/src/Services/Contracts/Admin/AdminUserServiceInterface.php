@@ -37,9 +37,9 @@ interface AdminUserServiceInterface
     public function changeRole(int $adminId, int $userId, Role $role): User;
 
     /**
-     * Blocks or unblocks a user (FR-ADM-02). Blocking also revokes all the user's refresh tokens,
-     * so they are logged out once their access token expires; login and refresh then fail
-     * (enforced in AuthServiceInterface). Blocking an already blocked user keeps the original date.
+     * Blocks or unblocks a user (FR-ADM-02). Blocking also revokes all the user's refresh tokens.
+     * The block takes effect immediately: JwtAuthMiddleware rejects the user's access token (403)
+     * and login and refresh fail (AuthServiceInterface). Blocking an already blocked user keeps the original date.
      *
      * @throws NotFoundException
      * @throws ConflictException the admin tries to block themselves

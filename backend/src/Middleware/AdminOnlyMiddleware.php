@@ -13,10 +13,8 @@ use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 
 /**
  * Lets only administrators through. Must run after JwtAuthMiddleware, which
- * puts the token's role into the request attribute "role".
- *
- * The role comes from the access token, so a change of a user's role in the
- * database takes effect when their token is next issued (at most 1 hour).
+ * puts the user's current role (loaded from the database) into the request attribute "role",
+ * so a role change takes effect immediately.
  */
 final class AdminOnlyMiddleware implements MiddlewareInterface
 {

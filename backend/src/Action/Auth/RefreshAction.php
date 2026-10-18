@@ -24,12 +24,13 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *      A token that was already revoked is treated as stolen: every refresh
  *      token of that account is revoked, so all devices must sign in again.
  *
- * Response: 200 { "token", "refresh_token", "user": { "id", "name", "email", "role" } }
+ * Response: 200 { "token", "refresh_token", "user": { "id", "name", "email", "role", "timezone", "created_at" } }
  * Errors:   422 Validation failed.
  *           401 invalid.refresh.token — the token does not exist.
  *           401 security.token_compromised.relogin_required — the token was already used.
  *           401 invalid.expired.refresh.token — the token expired.
  *           401 not.found.user — the account no longer exists.
+ *           403 auth.account_blocked — the account was blocked by an admin (FR-ADM-02).
  */
 final readonly class RefreshAction
 {

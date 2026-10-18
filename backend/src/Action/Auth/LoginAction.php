@@ -22,10 +22,11 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *      issues a new JWT access token plus a new refresh token. Earlier
  *      sessions of the account stay valid.
  *
- * Response: 200 { "token", "refresh_token", "user": { "id", "name", "email", "role" } }
+ * Response: 200 { "token", "refresh_token", "user": { "id", "name", "email", "role", "timezone", "created_at" } }
  * Errors:   422 Validation failed.
  *           401 not.found.user.invalid.credentials — unknown e-mail or wrong
  *               password (deliberately the same error for both).
+ *           403 auth.account_blocked — correct password, but the account is blocked (FR-ADM-02).
  */
 
 final class LoginAction

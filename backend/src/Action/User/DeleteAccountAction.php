@@ -18,7 +18,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Body:     { "password" }
  *
  * Response: 204 (no body). The client drops its tokens – refresh tokens are gone with the account,
- *           the access token stops working on its next use (404 on /me).
+ *           the access token is rejected on its next use (401 not.found.user).
  * Errors:   401 Missing bearer token. / Invalid or expired token.
  *           404 not.found.user
  *           409 user.delete.last_admin — the only admin cannot delete themselves
