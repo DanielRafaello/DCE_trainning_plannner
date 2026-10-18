@@ -23,8 +23,10 @@ use App\Services\Auth\AuthService;
 use App\Services\Category\CategoryService;
 use App\Services\Contracts\Auth\AuthServiceInterface;
 use App\Services\Contracts\Category\CategoryServiceInterface;
+use App\Services\Contracts\DayNote\DayNoteServiceInterface;
 use App\Services\Contracts\Subcategory\SubcategoryServiceInterface;
 use App\Services\Contracts\User\UserServiceInterface;
+use App\Services\DayNote\DayNoteService;
 use App\Services\Subcategory\SubcategoryService;
 use App\Services\User\UserService;
 use App\Services\JWT\JwtService;
@@ -149,5 +151,6 @@ return [
     CategoryServiceInterface::class        => \DI\autowire(CategoryService::class),
     SubcategoryServiceInterface::class     => \DI\autowire(SubcategoryService::class),
     UserServiceInterface::class            => \DI\autowire(UserService::class),
+    DayNoteServiceInterface::class         => \DI\autowire(DayNoteService::class),
 
 ];

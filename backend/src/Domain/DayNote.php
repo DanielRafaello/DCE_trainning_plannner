@@ -9,6 +9,11 @@ namespace App\Domain;
  */
 final readonly class DayNote
 {
+    /** Content length in characters (FR-DAY-01) – matches the CHECK on day_notes.content */
+    public const int CONTENT_MAX_LENGTH = 5000;
+
+    public const string DATE_FORMAT = 'Y-m-d';
+
     public function __construct(
         public int $id,
         public int $userId,
