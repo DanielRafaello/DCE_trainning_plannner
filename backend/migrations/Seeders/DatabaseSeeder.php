@@ -20,6 +20,10 @@ final readonly class DatabaseSeeder
     {
         $this->connection->transactional(function (Connection $connection): void {
             new CategorySeeder($connection)->run();
+
+            // Demo data for guest@gmail.com (subcategories, events, to-do lists, day notes).
+            // Development/demo only – the guest user must already exist. Uncomment to seed it.
+            // new guest\GuestSeeder($connection)->run();
             // $this->call(AnotherSeeder::class);
         });
     }
