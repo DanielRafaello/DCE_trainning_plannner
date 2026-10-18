@@ -26,10 +26,12 @@ use App\Services\Contracts\Admin\AdminUserServiceInterface;
 use App\Services\Contracts\Auth\AuthServiceInterface;
 use App\Services\Contracts\Category\CategoryServiceInterface;
 use App\Services\Contracts\DayNote\DayNoteServiceInterface;
+use App\Services\Contracts\Event\EventServiceInterface;
 use App\Services\Contracts\Subcategory\SubcategoryServiceInterface;
 use App\Services\Contracts\TodoList\TodoListServiceInterface;
 use App\Services\Contracts\User\UserServiceInterface;
 use App\Services\DayNote\DayNoteService;
+use App\Services\Event\EventService;
 use App\Services\Subcategory\SubcategoryService;
 use App\Services\TodoList\TodoListService;
 use App\Services\User\UserService;
@@ -156,6 +158,7 @@ return [
     UserServiceInterface::class            => \DI\autowire(UserService::class),
     TodoListServiceInterface::class        => \DI\autowire(TodoListService::class),
     DayNoteServiceInterface::class         => \DI\autowire(DayNoteService::class),
+    EventServiceInterface::class           => \DI\autowire(EventService::class),
     AdminUserServiceInterface::class       => \DI\autowire(AdminUserService::class),
 
 ];

@@ -12,6 +12,16 @@ use DateTimeImmutable;
  */
 final readonly class Event
 {
+    /** Title length in characters (FR-EVT-01) – matches VARCHAR(150) on events.title */
+    public const int TITLE_MIN_LENGTH = 1;
+    public const int TITLE_MAX_LENGTH = 150;
+
+    /** FR-EVT-01 – matches the CHECK on events.description */
+    public const int DESCRIPTION_MAX_LENGTH = 5000;
+
+    /** FR-EVT-02 – matches chk_events_time_range */
+    public const int MAX_DURATION_SECONDS = 24 * 3600;
+
     public function __construct(
         public int $id,
         public int $userId,
