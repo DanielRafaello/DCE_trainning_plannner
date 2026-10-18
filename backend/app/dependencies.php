@@ -30,11 +30,13 @@ use App\Services\Contracts\Event\EventServiceInterface;
 use App\Services\Contracts\Subcategory\SubcategoryServiceInterface;
 use App\Services\Contracts\TodoList\TodoListServiceInterface;
 use App\Services\Contracts\User\UserServiceInterface;
+use App\Services\Contracts\Week\WeekServiceInterface;
 use App\Services\DayNote\DayNoteService;
 use App\Services\Event\EventService;
 use App\Services\Subcategory\SubcategoryService;
 use App\Services\TodoList\TodoListService;
 use App\Services\User\UserService;
+use App\Services\Week\WeekService;
 use App\Services\JWT\JwtService;
 use App\Settings\Settings;
 use App\Settings\SettingsFactory;
@@ -159,6 +161,7 @@ return [
     TodoListServiceInterface::class        => \DI\autowire(TodoListService::class),
     DayNoteServiceInterface::class         => \DI\autowire(DayNoteService::class),
     EventServiceInterface::class           => \DI\autowire(EventService::class),
+    WeekServiceInterface::class            => \DI\autowire(WeekService::class),
     AdminUserServiceInterface::class       => \DI\autowire(AdminUserService::class),
 
 ];
