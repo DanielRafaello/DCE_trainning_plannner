@@ -16,7 +16,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Body:     none.
  *
  * Response: 200 { "categories": [ { "id", "slug", "name", "position" } ] } in display order
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  */
 final readonly class ListCategoriesAction
 {

@@ -20,7 +20,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *
  * Response: 200 { "users": [ { "id", "name", "email", "role", "timezone", "blocked_at", "created_at" } ],
  *                 "total", "page", "per_page" }
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           403 auth.forbidden.admin_only
  *           422 Validation failed.
  */

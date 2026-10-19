@@ -18,7 +18,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Body:     { "content" } — plain text, max. 5,000 chars; "" deletes the note
  *
  * Response: 200 { "note": { "date", "content", "created_at", "updated_at" } | null } – null = deleted
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           422 Validation failed. — content missing or too long; date: day_note.date_invalid
  */
 final readonly class SaveDayNoteAction

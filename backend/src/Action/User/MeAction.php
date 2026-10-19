@@ -20,7 +20,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *   1. AuthService::currentUser loads the user with that id.
  *
  * Response: 200 { "user": { "id", "name", "email", "role", "timezone", "created_at" } }
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           401 not.found.user — the account was deleted after the token was issued (JwtAuthMiddleware).
  *           403 auth.account_blocked
  */

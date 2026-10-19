@@ -20,7 +20,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *             "events": [ … same fields as in GET /events … ],  everything overlapping the week
  *             "notes":  [ { "date", "content", "created_at", "updated_at" } ]  only days that have a note
  *           }
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           422 Validation failed. — date: week.date_invalid
  */
 final readonly class GetWeekAction

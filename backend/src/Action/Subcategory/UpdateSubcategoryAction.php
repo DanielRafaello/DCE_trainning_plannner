@@ -18,7 +18,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Body:     { "name"?, "color"? } — a missing (or null) field keeps the current value
  *
  * Response: 200 { "subcategory": { "id", "category_id", "name", "color", "created_at", "updated_at" } }
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           404 not.found.subcategory — also for another user's subcategory.
  *           422 Validation failed. — name: subcategory.name_length / subcategory.name_taken;
  *               color: subcategory.color_format

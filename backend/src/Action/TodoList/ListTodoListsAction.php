@@ -15,7 +15,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Auth:     JWT.
  *
  * Response: 200 { "todo_lists": [ { "id", "title", "updated_at" } ] } most recently edited first
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  */
 final readonly class ListTodoListsAction
 {

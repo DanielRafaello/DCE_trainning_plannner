@@ -18,7 +18,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Body:     { "category_id", "name", "color"? } — color `#RRGGBB`; missing = one from the default palette
  *
  * Response: 201 { "subcategory": { "id", "category_id", "name", "color", "created_at", "updated_at" } }
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           422 Validation failed. — category_id: not.found.category;
  *               name: subcategory.name_length / subcategory.name_taken; color: subcategory.color_format
  */

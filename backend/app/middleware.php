@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Middleware\CorsMiddleware;
 use App\Middleware\HttpErrorHandler;
+use App\Middleware\OriginCheckMiddleware;
 use App\Middleware\RateLimitMiddleware;
 use App\Middleware\SecurityHeadersMiddleware;
 use Doctrine\DBAL\Connection;
@@ -26,6 +27,10 @@ return function (App $app): void {
         windowSeconds: 60,
         httpErrorHandler: $errorHandler,
     ));
+
+    // ─── CSRF – reject state-changing requests from a foreign Origin ─
+    // (auth is cookie-based, the browser sends the cookies automatically)
+    $app->add($container->get(OriginCheckMiddleware::class));
 
     // ─── Routing ───────────────────────────────────────────────────
     $app->addRoutingMiddleware();

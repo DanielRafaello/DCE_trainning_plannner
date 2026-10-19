@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Infrastructure\AuthCookies;
 use App\Middleware\CorsMiddleware;
+use App\Middleware\OriginCheckMiddleware;
 use App\Repositories\CategoryRepository;
 use App\Repositories\Contracts\CategoryRepositoryInterface;
 use App\Repositories\Contracts\DayNoteRepositoryInterface;
@@ -124,6 +126,25 @@ return [
         $s = $c->get(Settings::class);
 
         return new CorsMiddleware($c->get(ResponseFactoryInterface::class), $s->get('app.frontend_url'));
+    },
+
+    OriginCheckMiddleware::class => function (ContainerInterface $c): OriginCheckMiddleware {
+        /** @var Settings $s */
+        $s = $c->get(Settings::class);
+
+        return new OriginCheckMiddleware($s->get('app.frontend_url'));
+    },
+
+    // ─── Auth cookies (HttpOnly transport of the access + refresh token) ─
+    AuthCookies::class => function (ContainerInterface $c): AuthCookies {
+        /** @var Settings $s */
+        $s = $c->get(Settings::class);
+
+        return new AuthCookies(
+            $s->get('jwt.ttl_seconds'),
+            $s->get('jwt.refresh_ttl_seconds'),
+            $s->get('cookie.secure'),
+        );
     },
 
     // ─── JWT ────────────────────────────────────────────────────────

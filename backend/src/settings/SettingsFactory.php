@@ -26,6 +26,10 @@ class SettingsFactory
                   'ttl_seconds'         => (int) ($_ENV['JWT_TTL_SECONDS'] ?? 604800),
                   'refresh_ttl_seconds' => (int) ($_ENV['REFRESH_TTL_SECONDS'] ?? 2592000),
               ],
+              'cookie' => [
+                  // Secure works on http://localhost too; turn off only for plain-HTTP non-localhost hosts
+                  'secure' => filter_var($_ENV['COOKIE_SECURE'] ?? 'true', FILTER_VALIDATE_BOOL),
+              ],
           ]
         );
     }

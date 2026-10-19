@@ -6,6 +6,7 @@ namespace App\Middleware;
 
 use App\Exceptions\generalExceptions\ForbiddenException;
 use App\Exceptions\generalExceptions\UnauthorizedException;
+use App\Infrastructure\AuthCookies;
 use App\Repositories\Contracts\UserRepositoryInterface;
 use App\Services\JWT\JwtService;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -14,7 +15,7 @@ use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 
 /**
- * Verifies the Authorization: Bearer <token> header and exposes the user
+ * Verifies the JWT from the HttpOnly access_token cookie (AuthCookies) and exposes the user
  * as request attributes (user_id, role) for downstream Actions.
  *
  * The user is loaded from the database on every request (one primary-key lookup), so that
@@ -26,18 +27,16 @@ readonly class JwtAuthMiddleware implements MiddlewareInterface
     public function __construct(
         private JwtService $jwt,
         private UserRepositoryInterface $users,
+        private AuthCookies $cookies,
     ) {
     }
 
     public function process(Request $request, RequestHandler $handler): Response
     {
-        $header = $request->getHeaderLine('Authorization');
+        $token = $this->cookies->accessToken($request)
+            ?? throw new UnauthorizedException('Missing access token.');
 
-        if (!str_starts_with($header, 'Bearer ')) {
-            throw new UnauthorizedException('Missing bearer token.');
-        }
-
-        $claims = $this->jwt->verify(substr($header, 7));
+        $claims = $this->jwt->verify($token);
 
         $user = $this->users->findById((int) $claims['sub'])
             ?? throw new UnauthorizedException('not.found.user'); // account deleted after the token was issued

@@ -15,7 +15,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Auth:     JWT.
  *
  * Response: 204 (no body)
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           404 not.found.todo_list — also for another user's list.
  */
 final readonly class DeleteTodoListAction

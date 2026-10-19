@@ -16,7 +16,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Body:     none.
  *
  * Response: 204 (no body)
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           404 not.found.subcategory — also for another user's subcategory.
  *           409 subcategory.has_events:<count> — events still reference it.
  */

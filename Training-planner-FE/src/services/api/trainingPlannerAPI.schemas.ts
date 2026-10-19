@@ -5,11 +5,17 @@
  * REST API of the TrainingPlanner backend (Slim 4 + PostgreSQL), consumed by the Vue frontend.
  *
  * ## Authentication
- * `POST /auth/login` / `POST /auth/register` return a short-lived JWT access token (`token`) and a
- * long-lived opaque refresh token (`refresh_token`). Send the access token as
- * `Authorization: Bearer <token>`. When it expires, exchange the refresh token at `POST /auth/refresh`
- * – the refresh token is **rotated** (the old one is revoked, a new pair is returned). Reusing an
- * already rotated refresh token revokes all of the user's sessions.
+ * `POST /auth/login` / `POST /auth/register` set two **HttpOnly cookies** – a short-lived JWT access
+ * token (`access_token`, `Path=/`, `SameSite=Lax`) and a long-lived opaque refresh token
+ * (`refresh_token`, `Path=/auth`, `SameSite=Strict`). The tokens never appear in a response body and
+ * JavaScript cannot read them; the browser sends them automatically (cross-origin requests need
+ * `credentials: 'include'` / axios `withCredentials: true`). When the access token expires, call
+ * `POST /auth/refresh` (no body) – the refresh token is **rotated** (the old one is revoked, a new pair
+ * is set). Reusing an already rotated refresh token revokes all of the user's sessions.
+ * `POST /auth/logout` revokes the refresh token and deletes both cookies.
+ *
+ * State-changing requests (POST/PUT/PATCH/DELETE) carrying an `Origin` header other than the
+ * frontend URL are rejected with 403 `security.origin_not_allowed` (CSRF protection).
  *
  * The user is loaded from the database on every authenticated request, so a deleted account (401),
  * a blocked account (403) or a role change take effect immediately.
@@ -105,11 +111,10 @@ export interface UserResponse {
   user: User;
 }
 
+/**
+ * The tokens are not in the body – they are set as HttpOnly cookies (`Set-Cookie`).
+ */
 export interface AuthResponse {
-  /** JWT access token for the `Authorization: Bearer` header */
-  token: string;
-  /** Opaque refresh token for `/auth/refresh` and `/auth/logout` */
-  refresh_token: string;
   user: User;
 }
 
@@ -135,11 +140,6 @@ export interface LoginRequest {
   /** @maxLength 255 */
   email: string;
   password: string;
-}
-
-export interface RefreshTokenRequest {
-  /** The `refresh_token` from a previous auth response */
-  refreshToken: string;
 }
 
 export interface UpdateProfileRequest {

@@ -19,7 +19,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *
  * Response: 200 { "subcategories": [ { "id", "category_id", "name", "color", "created_at", "updated_at" } ] }
  *           ordered by category position, then name
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           422 Validation failed. — category is not a number or does not exist.
  */
 final readonly class ListSubcategoriesAction

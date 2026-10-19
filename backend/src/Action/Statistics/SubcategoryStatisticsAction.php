@@ -24,7 +24,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *             "subcategory": { "id", "name", "color" } | null,   null = events without a subcategory
  *             "planned": { … }, "done": { … }, "skipped": { … }, "completion_rate": { … }
  *           } ] }  grouped by category; every subcategory of the user, the unassigned row only when it has events
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           422 Validation failed. — invalid period; category: not.found.category
  */
 final readonly class SubcategoryStatisticsAction

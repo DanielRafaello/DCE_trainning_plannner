@@ -38,7 +38,7 @@ final readonly class CorsMiddleware implements MiddlewareInterface
         return $response
             ->withHeader('Access-Control-Allow-Origin', $this->allowedOrigin) # specific domain can read from this API
             ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS') # allowed methods
-            ->withHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization') # allowed headers - content-type for JSON, authorization for JWT
-            ->withHeader('Access-Control-Allow-Credentials', 'true'); # allow cookies and auth headers to be sent - Access-Control-Allow-Origin has to be set for safetz
+            ->withHeader('Access-Control-Allow-Headers', 'Content-Type') # allowed headers - content-type for JSON (JWT travels in a cookie, not in a header)
+            ->withHeader('Access-Control-Allow-Credentials', 'true'); # allow the auth cookies to be sent - Access-Control-Allow-Origin has to be a specific origin for that
     }
 }

@@ -19,7 +19,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *           The merged event is validated as a whole. The status never changes implicitly.
  *
  * Response: 200 { "event": { … same fields as in GET /events … } }
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           404 not.found.event — also for another user's event.
  *           422 Validation failed. — same field errors as POST /events
  */

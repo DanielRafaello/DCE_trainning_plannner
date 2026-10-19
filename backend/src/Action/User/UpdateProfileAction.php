@@ -18,7 +18,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Body:     { "name"?, "email"?, "timezone"? } — a missing (or null) field keeps the current value
  *
  * Response: 200 { "user": { "id", "name", "email", "role", "timezone", "created_at" } }
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           404 not.found.user
  *           422 Validation failed. — email: auth.register.email_taken; name: user.name_length;
  *               timezone: user.timezone_invalid

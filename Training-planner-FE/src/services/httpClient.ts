@@ -1,12 +1,9 @@
 import axios from 'axios';
 import type { AxiosError, AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import { getApiBaseUrl } from './apiConfig';
-import { tokenStorage } from './tokenStorage';
 
-interface AuthTokensResponse {
-  token: string;
-  refresh_token: string;
-}
+// Auth is cookie-based: the backend sets HttpOnly access_token / refresh_token cookies on
+// login / register / refresh and the browser sends them automatically. JS never sees the tokens.
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean };
 
@@ -18,6 +15,8 @@ const axiosInstance: AxiosInstance = axios.create({
   baseURL: getApiBaseUrl(),
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
+  // Needed only if the API runs on a different origin than the app (through the Vite proxy it's the same)
+  withCredentials: true,
 });
 
 // Called when the session can't be recovered (refresh failed, account blocked).
@@ -28,40 +27,21 @@ export const setOnSessionExpired = (handler: () => void): void => {
   onSessionExpired = handler;
 };
 
-// Request interceptor – attach JWT access token
-axiosInstance.interceptors.request.use((config) => {
-  const token = tokenStorage.getAccessToken();
-  if (token && !isAuthEndpoint(config.url)) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
 // The refresh token is rotated and reusing an old one revokes ALL sessions of the user,
 // so refreshes must never run in parallel - neither within a tab (shared promise)
-// nor across tabs (Web Locks + re-reading the token from localStorage inside the lock).
-let refreshPromise: Promise<string> | null = null;
+// nor across tabs (Web Locks; the browser sends the latest cookie once the lock is held).
+let refreshPromise: Promise<void> | null = null;
 
-const doRefresh = async (): Promise<string> => {
-  const refreshToken = tokenStorage.getRefreshToken();
-  if (!refreshToken) {
-    throw new Error('No refresh token');
-  }
-
+const doRefresh = async (): Promise<void> => {
   // Bare axios, not axiosInstance, so the interceptors don't loop
-  const { data } = await axios.post<AuthTokensResponse>(
-    `${getApiBaseUrl()}/auth/refresh`,
-    { refreshToken },
-    { timeout: 15000 },
-  );
-  tokenStorage.setTokens(data.token, data.refresh_token);
-  return data.token;
+  await axios.post(`${getApiBaseUrl()}/auth/refresh`, undefined, {
+    timeout: 15000,
+    withCredentials: true,
+  });
 };
 
-const refreshAccessToken = (): Promise<string> => {
+export const refreshSession = (): Promise<void> => {
   if (!refreshPromise) {
-    // doRefresh reads the refresh token only once it holds the lock, so it always
-    // uses the latest one even if another tab rotated it in the meantime
     refreshPromise = (navigator.locks
       ? navigator.locks.request('tp-token-refresh', doRefresh)
       : doRefresh()
@@ -83,14 +63,12 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (status === 401 && !config._retried && tokenStorage.getRefreshToken()) {
+    if (status === 401 && !config._retried) {
       config._retried = true;
       try {
-        const token = await refreshAccessToken();
-        config.headers.Authorization = `Bearer ${token}`;
+        await refreshSession();
         return axiosInstance(config);
       } catch (refreshError) {
-        tokenStorage.clear();
         onSessionExpired();
         return Promise.reject(refreshError);
       }
@@ -99,7 +77,6 @@ axiosInstance.interceptors.response.use(
     // 401 after a fresh token (deleted account) or 403 for a blocked account
     const message = (error.response?.data as { message?: string } | undefined)?.message;
     if (status === 401 || (status === 403 && message === 'auth.account_blocked')) {
-      tokenStorage.clear();
       onSessionExpired();
     }
 

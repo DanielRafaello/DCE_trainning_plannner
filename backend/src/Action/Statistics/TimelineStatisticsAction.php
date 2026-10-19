@@ -27,7 +27,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *             "total_minutes",
  *             "categories": [ { "category_id", "minutes" } ]   all 9 categories in display order
  *           } ] }  every bucket of the period, also empty ones
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           422 Validation failed. — invalid period/status/groupBy, groupBy: stats.timeline.too_many_buckets
  */
 final readonly class TimelineStatisticsAction

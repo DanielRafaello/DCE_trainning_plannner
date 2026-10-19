@@ -23,7 +23,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *             "planned": { "minutes", "count" }, "done": { … }, "skipped": { … },
  *             "completion_rate": { "by_count", "by_minutes" }   0–1, null = nothing done or skipped
  *           } ] }  all 9 categories in display order, zeros included
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           422 Validation failed. — invalid from/to, to: stats.period.to_before_from / stats.period.too_long
  */
 final readonly class CategoryStatisticsAction

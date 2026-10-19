@@ -19,7 +19,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *           times ISO 8601 with offset; status missing = planned for a future start, done otherwise
  *
  * Response: 201 { "event": { … same fields as in GET /events … } }
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           422 Validation failed. — end_at: event.end_before_start / event.too_long (> 24 h);
  *               category_id: not.found.category; subcategory_id: not.found.subcategory /
  *               event.subcategory_category_mismatch; title: event.title_length

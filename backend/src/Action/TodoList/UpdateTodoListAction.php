@@ -18,7 +18,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Body:     { "title"?, "content"? } — a missing (or null) field keeps the current value; "" clears the content
  *
  * Response: 200 { "todo_list": { "id", "title", "content", "created_at", "updated_at" } }
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           404 not.found.todo_list — also for another user's list.
  *           422 Validation failed. — title: todo_list.title_length; content: todo_list.content_too_long
  */

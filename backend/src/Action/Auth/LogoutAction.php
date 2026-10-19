@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Action\Auth;
 
-use App\Exceptions\Validation\ValidationException;
-use App\Requests\Auth\RefreshRequest;
+use App\Infrastructure\AuthCookies;
 use App\Responder\Auth\LogoutResponder;
 use App\Services\Contracts\Auth\AuthServiceInterface;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -14,35 +13,33 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 /**
  * POST /auth/logout — end one session.
  *
- * Auth:     none; the refresh token in the body identifies the session.
- * Body:     { "refreshToken" }
+ * Auth:     none; the refresh_token cookie identifies the session.
+ * Body:     none.
  *
  * Steps:
- *   1. Validate the body (RefreshRequest): refreshToken is present.
- *   2. AuthService::logout revokes that refresh token. An unknown or already
- *      revoked token is ignored, so the call is safe to repeat. Other sessions
- *      of the account are untouched, and the JWT access token keeps working
- *      until it expires.
+ *   1. If a refresh_token cookie is present, AuthService::logout revokes that
+ *      refresh token. An unknown or already revoked token is ignored, so the
+ *      call is safe to repeat. Other sessions of the account are untouched.
+ *   2. Both auth cookies are deleted, so the access token is gone from this
+ *      browser too (the JWT itself stays valid until it expires).
  *
- * Response: 200 { "logged_out": true }
- * Errors:   422 Validation failed.
+ * Response: 200 { "logged_out": true } + Set-Cookie (deleting both cookies)
  */
 final class LogoutAction
 {
     public function __construct(
         private readonly AuthServiceInterface $authService,
         private readonly LogoutResponder $responder,
+        private readonly AuthCookies $cookies,
     ) {
     }
     public function __invoke(Request $request, Response $response): Response
     {
-        $form = new RefreshRequest((array) $request->getParsedBody());
+        $refreshToken = $this->cookies->refreshToken($request);
 
-        if ($form->fails()) {
-            throw new ValidationException($form->errors());
+        if ($refreshToken !== null) {
+            $this->authService->logout($refreshToken);
         }
-
-        $this->authService->logout($form->safe()['refreshToken']);
 
         return $this->responder->loggedOut($response);
     }

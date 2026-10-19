@@ -25,7 +25,9 @@ export default defineConfig({
       '/api': {
         target: BACKEND_URL,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        rewrite: (path) => path.replace(/^\/api/, ''),
+        // The backend scopes the refresh_token cookie to Path=/auth; in the browser that's /api/auth
+        cookiePathRewrite: { '/auth': '/api/auth' },
       }
     }
   }

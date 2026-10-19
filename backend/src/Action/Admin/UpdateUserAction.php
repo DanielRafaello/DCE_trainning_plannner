@@ -24,7 +24,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *      every request, login and refresh then return 403 auth.account_blocked
  *
  * Response: 200 { "user": { "id", "name", "email", "role", "timezone", "blocked_at", "created_at" } }
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           403 auth.forbidden.admin_only
  *           404 not.found.user
  *           409 admin.cannot_demote_self / admin.cannot_block_self / admin.last_admin

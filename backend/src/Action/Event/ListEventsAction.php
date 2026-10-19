@@ -24,7 +24,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Response: 200 { "events": [ { "id", "category_id", "subcategory_id", "title", "description",
  *                               "start_at", "end_at", "duration_minutes", "status", "created_at", "updated_at" } ] }
  *           ordered by start_at
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           422 Validation failed. — invalid from/to/status, to: event.range.to_before_from / event.range.too_long
  */
 final readonly class ListEventsAction

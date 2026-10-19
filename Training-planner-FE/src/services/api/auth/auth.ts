@@ -5,11 +5,17 @@
  * REST API of the TrainingPlanner backend (Slim 4 + PostgreSQL), consumed by the Vue frontend.
  *
  * ## Authentication
- * `POST /auth/login` / `POST /auth/register` return a short-lived JWT access token (`token`) and a
- * long-lived opaque refresh token (`refresh_token`). Send the access token as
- * `Authorization: Bearer <token>`. When it expires, exchange the refresh token at `POST /auth/refresh`
- * – the refresh token is **rotated** (the old one is revoked, a new pair is returned). Reusing an
- * already rotated refresh token revokes all of the user's sessions.
+ * `POST /auth/login` / `POST /auth/register` set two **HttpOnly cookies** – a short-lived JWT access
+ * token (`access_token`, `Path=/`, `SameSite=Lax`) and a long-lived opaque refresh token
+ * (`refresh_token`, `Path=/auth`, `SameSite=Strict`). The tokens never appear in a response body and
+ * JavaScript cannot read them; the browser sends them automatically (cross-origin requests need
+ * `credentials: 'include'` / axios `withCredentials: true`). When the access token expires, call
+ * `POST /auth/refresh` (no body) – the refresh token is **rotated** (the old one is revoked, a new pair
+ * is set). Reusing an already rotated refresh token revokes all of the user's sessions.
+ * `POST /auth/logout` revokes the refresh token and deletes both cookies.
+ *
+ * State-changing requests (POST/PUT/PATCH/DELETE) carrying an `Origin` header other than the
+ * frontend URL are rejected with 403 `security.origin_not_allowed` (CSRF protection).
  *
  * The user is loaded from the database on every authenticated request, so a deleted account (401),
  * a blocked account (403) or a role change take effect immediately.
@@ -38,7 +44,6 @@ import type {
   AuthResponse,
   LoginRequest,
   LogoutResponse,
-  RefreshTokenRequest,
   RegisterRequest
 } from '../trainingPlannerAPI.schemas';
 
@@ -78,32 +83,29 @@ const login = (
       options);
     }
   /**
- * Rotates the refresh token – the one sent is revoked and a new access + refresh token is returned.
- * Presenting an already revoked token is treated as theft and revokes all of the user's sessions
- * (`security.token_compromised.relogin_required`).
- * @summary Exchange a refresh token for a new token pair
+ * Rotates the refresh token – the one in the `refresh_token` cookie is revoked and new
+ * `access_token` + `refresh_token` cookies are set. Presenting an already revoked token is treated
+ * as theft and revokes all of the user's sessions (`security.token_compromised.relogin_required`).
+ * @summary Exchange the refresh token cookie for a new token pair
  */
 const refreshToken = (
-    refreshTokenRequest: BodyType<RefreshTokenRequest>,
+
  options?: SecondParameter<typeof httpClient<AuthResponse>>,) => {
       return httpClient<AuthResponse>(
-      {url: `/auth/refresh`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: refreshTokenRequest
+      {url: `/auth/refresh`, method: 'POST'
     },
       options);
     }
   /**
- * Revokes the given refresh token. Always succeeds for a syntactically valid request, even if the token is unknown.
- * @summary Revoke a refresh token
+ * Revokes the refresh token from the `refresh_token` cookie (if any) and deletes both auth cookies.
+ * Always succeeds, even without a cookie or with an unknown token.
+ * @summary Revoke the refresh token and delete the auth cookies
  */
 const logout = (
-    refreshTokenRequest: BodyType<RefreshTokenRequest>,
+
  options?: SecondParameter<typeof httpClient<LogoutResponse>>,) => {
       return httpClient<LogoutResponse>(
-      {url: `/auth/logout`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: refreshTokenRequest
+      {url: `/auth/logout`, method: 'POST'
     },
       options);
     }

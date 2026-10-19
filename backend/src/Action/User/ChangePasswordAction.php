@@ -21,10 +21,10 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *   1. Validate the body (ChangePasswordRequest).
  *   2. UserService::changePassword verifies the current password, stores the new hash and revokes
  *      ALL refresh tokens of the user, so other devices are logged out.
- *   3. A fresh token pair is returned – the client replaces its tokens and stays logged in.
+ *   3. A fresh token pair is set as cookies – the browser stays logged in.
  *
- * Response: 200 { "token", "refresh_token", "user": { "id", "name", "email", "role", "timezone", "created_at" } }
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Response: 200 { "user": { "id", "name", "email", "role", "timezone", "created_at" } }
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           404 not.found.user
  *           422 Validation failed. — current_password: user.password.invalid
  */

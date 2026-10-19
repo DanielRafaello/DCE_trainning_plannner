@@ -7,11 +7,17 @@ info:
     REST API of the TrainingPlanner backend (Slim 4 + PostgreSQL), consumed by the Vue frontend.
 
     ## Authentication
-    `POST /auth/login` / `POST /auth/register` return a short-lived JWT access token (`token`) and a
-    long-lived opaque refresh token (`refresh_token`). Send the access token as
-    `Authorization: Bearer <token>`. When it expires, exchange the refresh token at `POST /auth/refresh`
-    – the refresh token is **rotated** (the old one is revoked, a new pair is returned). Reusing an
-    already rotated refresh token revokes all of the user's sessions.
+    `POST /auth/login` / `POST /auth/register` set two **HttpOnly cookies** – a short-lived JWT access
+    token (`access_token`, `Path=/`, `SameSite=Lax`) and a long-lived opaque refresh token
+    (`refresh_token`, `Path=/auth`, `SameSite=Strict`). The tokens never appear in a response body and
+    JavaScript cannot read them; the browser sends them automatically (cross-origin requests need
+    `credentials: 'include'` / axios `withCredentials: true`). When the access token expires, call
+    `POST /auth/refresh` (no body) – the refresh token is **rotated** (the old one is revoked, a new pair
+    is set). Reusing an already rotated refresh token revokes all of the user's sessions.
+    `POST /auth/logout` revokes the refresh token and deletes both cookies.
+
+    State-changing requests (POST/PUT/PATCH/DELETE) carrying an `Origin` header other than the
+    frontend URL are rejected with 403 `security.origin_not_allowed` (CSRF protection).
 
     The user is loaded from the database on every authenticated request, so a deleted account (401),
     a blocked account (403) or a role change take effect immediately.
@@ -61,7 +67,7 @@ tags:
     description: User administration (admin role only)
 
 security:
-  - bearerAuth: []
+  - cookieAuth: []
 
 paths:
   # ─── Auth ─────────────────────────────────────────────────────
@@ -134,29 +140,24 @@ paths:
     post:
       tags: [Auth]
       operationId: refreshToken
-      summary: Exchange a refresh token for a new token pair
+      summary: Exchange the refresh token cookie for a new token pair
       description: |
-        Rotates the refresh token – the one sent is revoked and a new access + refresh token is returned.
-        Presenting an already revoked token is treated as theft and revokes all of the user's sessions
-        (`security.token_compromised.relogin_required`).
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RefreshTokenRequest'
+        Rotates the refresh token – the one in the `refresh_token` cookie is revoked and new
+        `access_token` + `refresh_token` cookies are set. Presenting an already revoked token is treated
+        as theft and revokes all of the user's sessions (`security.token_compromised.relogin_required`).
+      security:
+        - refreshCookie: []
       responses:
         '200':
-          description: New token pair
+          description: New token pair set as cookies
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
           description: |
-            Refresh token unknown, expired or reused
-            (`invalid.refresh.token`, `invalid.expired.refresh.token`,
+            Refresh token missing, unknown, expired or reused
+            (`missing.refresh.token`, `invalid.refresh.token`, `invalid.expired.refresh.token`,
             `security.token_compromised.relogin_required`, `not.found.user`)
           content:
             application/json:
@@ -168,8 +169,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '422':
-          $ref: '#/components/responses/ValidationError'
         '429':
           $ref: '#/components/responses/TooManyRequests'
 
@@ -177,24 +176,18 @@ paths:
     post:
       tags: [Auth]
       operationId: logout
-      summary: Revoke a refresh token
-      description: Revokes the given refresh token. Always succeeds for a syntactically valid request, even if the token is unknown.
+      summary: Revoke the refresh token and delete the auth cookies
+      description: |
+        Revokes the refresh token from the `refresh_token` cookie (if any) and deletes both auth cookies.
+        Always succeeds, even without a cookie or with an unknown token.
       security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RefreshTokenRequest'
       responses:
         '200':
-          description: Logged out
+          description: Logged out, cookies deleted
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LogoutResponse'
-        '422':
-          $ref: '#/components/responses/ValidationError'
         '429':
           $ref: '#/components/responses/TooManyRequests'
 
@@ -288,8 +281,8 @@ paths:
       operationId: changePassword
       summary: Change own password
       description: |
-        Changes the password, revokes all refresh tokens (logs out every device) and returns a
-        fresh token pair for the current client.
+        Changes the password, revokes all refresh tokens (logs out every device) and sets a
+        fresh token pair (cookies) for the current client.
       requestBody:
         required: true
         content:
@@ -298,7 +291,7 @@ paths:
               $ref: '#/components/schemas/ChangePasswordRequest'
       responses:
         '200':
-          description: Password changed, new token pair
+          description: Password changed, new token pair set as cookies
           content:
             application/json:
               schema:
@@ -1041,10 +1034,16 @@ paths:
 
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+      description: JWT access token in an HttpOnly cookie, set by login / register / refresh
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+      description: Opaque refresh token in an HttpOnly cookie (`Path=/auth`)
 
   parameters:
     IdPath:
@@ -1264,14 +1263,9 @@ components:
 
     AuthResponse:
       type: object
-      required: [token, refresh_token, user]
+      description: The tokens are not in the body – they are set as HttpOnly cookies (`Set-Cookie`).
+      required: [user]
       properties:
-        token:
-          type: string
-          description: 'JWT access token for the `Authorization: Bearer` header'
-        refresh_token:
-          type: string
-          description: Opaque refresh token for `/auth/refresh` and `/auth/logout`
         user:
           $ref: '#/components/schemas/User'
 
@@ -1312,14 +1306,6 @@ components:
           maxLength: 255
         password:
           type: string
-
-    RefreshTokenRequest:
-      type: object
-      required: [refreshToken]
-      properties:
-        refreshToken:
-          type: string
-          description: The `refresh_token` from a previous auth response
 
     UpdateProfileRequest:
       type: object

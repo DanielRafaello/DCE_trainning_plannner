@@ -19,7 +19,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  *
  * Response: 201 { "todo_list": { "id", "title", "content", "created_at", "updated_at" } }
  *           content is the sanitized HTML – the client should show this, not what it sent
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           422 Validation failed. — title: todo_list.title_length; content: todo_list.content_too_long
  */
 final readonly class CreateTodoListAction

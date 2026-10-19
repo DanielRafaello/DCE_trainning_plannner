@@ -15,7 +15,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Auth:     JWT.
  *
  * Response: 200 { "event": { … same fields as in GET /events … } }
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           404 not.found.event — also for another user's event (FR-EVT-09).
  */
 final readonly class GetEventAction

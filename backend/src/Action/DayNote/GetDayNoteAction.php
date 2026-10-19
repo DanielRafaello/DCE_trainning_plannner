@@ -15,7 +15,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Auth:     JWT.
  *
  * Response: 200 { "note": { "date", "content", "created_at", "updated_at" } | null } – null = the day has no note
- * Errors:   401 Missing bearer token. / Invalid or expired token.
+ * Errors:   401 Missing access token. / Invalid or expired token.
  *           422 Validation failed. — date: day_note.date_invalid (e.g. 2026-02-30)
  */
 final readonly class GetDayNoteAction

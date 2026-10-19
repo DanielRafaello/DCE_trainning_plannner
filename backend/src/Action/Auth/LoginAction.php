@@ -19,10 +19,10 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  * Steps:
  *   1. Validate the body (LoginRequest): both fields present, e-mail well-formed.
  *   2. AuthService::login checks the password against the stored hash and
- *      issues a new JWT access token plus a new refresh token. Earlier
+ *      issues a new JWT access token plus a new refresh token (set as cookies). Earlier
  *      sessions of the account stay valid.
  *
- * Response: 200 { "token", "refresh_token", "user": { "id", "name", "email", "role", "timezone", "created_at" } }
+ * Response: 200 { "user": { "id", "name", "email", "role", "timezone", "created_at" } }
  * Errors:   422 Validation failed.
  *           401 not.found.user.invalid.credentials — unknown e-mail or wrong
  *               password (deliberately the same error for both).
