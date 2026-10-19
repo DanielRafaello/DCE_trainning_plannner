@@ -23,7 +23,7 @@ services:
     depends_on:
       - db
 
-  Training-planner-FE:
+  training-planner-fe:
     build:
       context: ./Training-planner-FE
       dockerfile: .devcontainer/Dockerfile
