@@ -1,0 +1,1908 @@
+openapi: 3.0.3
+
+info:
+  title: TrainingPlanner API
+  version: 1.0.0
+  description: |
+    REST API of the TrainingPlanner backend (Slim 4 + PostgreSQL), consumed by the Vue frontend.
+
+    ## Authentication
+    `POST /auth/login` / `POST /auth/register` return a short-lived JWT access token (`token`) and a
+    long-lived opaque refresh token (`refresh_token`). Send the access token as
+    `Authorization: Bearer <token>`. When it expires, exchange the refresh token at `POST /auth/refresh`
+    – the refresh token is **rotated** (the old one is revoked, a new pair is returned). Reusing an
+    already rotated refresh token revokes all of the user's sessions.
+
+    The user is loaded from the database on every authenticated request, so a deleted account (401),
+    a blocked account (403) or a role change take effect immediately.
+
+    ## Errors
+    Every error has the same JSON body (`ErrorResponse`). Validation errors (422) additionally contain
+    `errors` – a map of field name → first error message. Messages coming from the services are
+    translation keys (e.g. `auth.register.email_taken`, `not.found.event`), messages from the
+    request validator are English sentences (e.g. `Title is required.`).
+
+    ## Dates and times
+    * Instants sent by the client (`start_at`, `end_at`, `from`, `to`) must be ISO 8601 **with a
+      timezone offset** – `2026-10-18T10:00:00.000Z` or `2026-10-18T12:00:00+02:00` (JS `toISOString()`
+      works). Without the offset the request is rejected.
+    * Calendar dates (day notes, week, statistics buckets) are plain `YYYY-MM-DD` interpreted in the
+      user's timezone (`User.timezone`).
+    * `created_at` / `updated_at` / `blocked_at` are PostgreSQL `timestamptz` values as text
+      (e.g. `2026-10-18 08:00:00.123456+00`); parse them leniently.
+
+    ## Rate limiting
+    50 requests per 60 seconds per IP. Exceeding it returns 429 with a `Retry-After` header.
+
+servers:
+  - url: http://localhost:8080
+    description: Local docker-compose
+
+tags:
+  - name: Auth
+    description: Registration, login and token handling
+  - name: Me
+    description: The signed-in user's own account
+  - name: Categories
+    description: Fixed, system-wide event categories
+  - name: Subcategories
+    description: User-defined subcategories of a category
+  - name: Events
+    description: Timetable events (trainings)
+  - name: Week
+    description: Week view – events and day notes of one week
+  - name: DayNotes
+    description: One free-text note per calendar day
+  - name: TodoLists
+    description: Rich-text (HTML) to-do lists
+  - name: Statistics
+    description: Aggregated time spent per category / subcategory / period
+  - name: Admin
+    description: User administration (admin role only)
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ─── Auth ─────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Register a new account
+      description: Creates a user with role `user` and signs them in.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registered and signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '422':
+          description: Validation failed (`email` → `auth.register.email_taken` when the email exists)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Sign in with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Wrong email or password (`not.found.user.invalid.credentials`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Account is blocked (`auth.account_blocked`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshToken
+      summary: Exchange a refresh token for a new token pair
+      description: |
+        Rotates the refresh token – the one sent is revoked and a new access + refresh token is returned.
+        Presenting an already revoked token is treated as theft and revokes all of the user's sessions
+        (`security.token_compromised.relogin_required`).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: |
+            Refresh token unknown, expired or reused
+            (`invalid.refresh.token`, `invalid.expired.refresh.token`,
+            `security.token_compromised.relogin_required`, `not.found.user`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Account is blocked (`auth.account_blocked`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Revoke a refresh token
+      description: Revokes the given refresh token. Always succeeds for a syntactically valid request, even if the token is unknown.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  # ─── Me ───────────────────────────────────────────────────────
+  /me:
+    get:
+      tags: [Me]
+      operationId: getMe
+      summary: Get the signed-in user
+      responses:
+        '200':
+          description: The signed-in user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    patch:
+      tags: [Me]
+      operationId: updateMe
+      summary: Update own profile
+      description: Partial update – omitted (or `null`) fields keep their value.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: |
+            Validation failed (`email` → `auth.register.email_taken`, `name` → `user.name_length`,
+            `timezone` → `user.timezone_invalid`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    delete:
+      tags: [Me]
+      operationId: deleteMe
+      summary: Delete own account
+      description: Permanently deletes the account and all its data. Requires the current password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAccountRequest'
+      responses:
+        '204':
+          description: Account deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: The last admin cannot delete their account (`user.delete.last_admin`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation failed (`password` → `user.password.invalid` when wrong)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /me/password:
+    put:
+      tags: [Me]
+      operationId: changePassword
+      summary: Change own password
+      description: |
+        Changes the password, revokes all refresh tokens (logs out every device) and returns a
+        fresh token pair for the current client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed, new token pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Validation failed (`current_password` → `user.password.invalid` when wrong)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  # ─── Categories ───────────────────────────────────────────────
+  /categories:
+    get:
+      tags: [Categories]
+      operationId: listCategories
+      summary: List all categories
+      description: The fixed set of categories, ordered by `position`.
+      responses:
+        '200':
+          description: Categories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  # ─── Subcategories ────────────────────────────────────────────
+  /subcategories:
+    get:
+      tags: [Subcategories]
+      operationId: listSubcategories
+      summary: List own subcategories
+      description: Ordered by category position, then by name (case-insensitive).
+      parameters:
+        - name: category
+          in: query
+          required: false
+          description: Only subcategories of this category
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Subcategories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubcategoryListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Validation failed (`category_id` → `not.found.category` for an unknown category)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    post:
+      tags: [Subcategories]
+      operationId: createSubcategory
+      summary: Create a subcategory
+      description: |
+        Names are unique per user and category (case-insensitive). When `color` is omitted, the first
+        color of a fixed palette not yet used in the category is assigned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubcategoryRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubcategoryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: |
+            Validation failed (`name` → `subcategory.name_taken` / `subcategory.name_length`,
+            `color` → `subcategory.color_format`, `category_id` → `not.found.category`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /subcategories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    patch:
+      tags: [Subcategories]
+      operationId: updateSubcategory
+      summary: Rename / recolor a subcategory
+      description: Partial update – omitted (or `null`) fields keep their value. The category cannot be changed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSubcategoryRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubcategoryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Validation failed (`name` → `subcategory.name_taken` / `subcategory.name_length`, `color` → `subcategory.color_format`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    delete:
+      tags: [Subcategories]
+      operationId: deleteSubcategory
+      summary: Delete a subcategory
+      description: Only possible when no event uses it.
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            The subcategory still has events. The message is `subcategory.has_events:<count>`,
+            e.g. `subcategory.has_events:3`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  # ─── Events ───────────────────────────────────────────────────
+  /events:
+    get:
+      tags: [Events]
+      operationId: listEvents
+      summary: List own events in a time range
+      description: |
+        Returns events overlapping `[from, to)`, ordered by `start_at`. The range may be at most 1 year.
+      parameters:
+        - $ref: '#/components/parameters/FromQuery'
+        - $ref: '#/components/parameters/ToQuery'
+        - name: category
+          in: query
+          required: false
+          description: Filter by category id
+          schema:
+            type: integer
+        - name: subcategory
+          in: query
+          required: false
+          description: Filter by subcategory id
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/StatusListQuery'
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: |
+            Validation failed (`to` → `event.range.to_before_from` / `event.range.too_long`,
+            `status` → `event.status_invalid`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    post:
+      tags: [Events]
+      operationId: createEvent
+      summary: Create an event
+      description: |
+        The event may last at most 24 hours and must end after it starts. The subcategory (if any)
+        must belong to the user and to the chosen category. When `status` is omitted it defaults to
+        `planned` for a future start and `done` for a past one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/EventValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /events/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      tags: [Events]
+      operationId: getEvent
+      summary: Get one event
+      responses:
+        '200':
+          description: The event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    patch:
+      tags: [Events]
+      operationId: updateEvent
+      summary: Update an event
+      description: |
+        Partial update – omitted fields keep their value. `subcategory_id: null` removes the
+        subcategory, `description: null` clears the description. `start_at`, `end_at`, `category_id`
+        and `status` set to `null` are ignored (kept). The status is never changed implicitly.
+        The resulting event is validated as a whole (same rules as create).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEventRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/EventValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    delete:
+      tags: [Events]
+      operationId: deleteEvent
+      summary: Delete an event
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  # ─── Week ─────────────────────────────────────────────────────
+  /weeks/{date}:
+    get:
+      tags: [Week]
+      operationId: getWeek
+      summary: Get one week (Monday–Sunday)
+      description: |
+        Returns the week containing `date`, computed in the user's timezone: Monday 00:00 to the next
+        Monday 00:00 (exclusive). Contains all events overlapping the week (ordered by start) and the
+        day notes of its 7 days (ordered by date).
+      parameters:
+        - name: date
+          in: path
+          required: true
+          description: A calendar day (`2026-10-18`) or an ISO week (`2026-W42`)
+          schema:
+            type: string
+            pattern: '^(\d{4}-\d{2}-\d{2}|\d{4}-W\d{2})$'
+            example: 2026-W42
+      responses:
+        '200':
+          description: The week
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeekResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Invalid date or week (`date` → `week.date_invalid`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  # ─── Day notes ────────────────────────────────────────────────
+  /days/{date}/note:
+    parameters:
+      - $ref: '#/components/parameters/DatePath'
+    get:
+      tags: [DayNotes]
+      operationId: getDayNote
+      summary: Get the note of a day
+      description: A day without a note is not an error – `note` is `null`.
+      responses:
+        '200':
+          description: The note or null
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DayNoteResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Impossible date, e.g. `2026-02-30` (`date` → `day_note.date_invalid`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    put:
+      tags: [DayNotes]
+      operationId: saveDayNote
+      summary: Create, replace or delete the note of a day
+      description: |
+        Upserts the note. An empty (or whitespace-only / `null`) `content` deletes the note and
+        returns `note: null`. The `content` key itself is required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveDayNoteRequest'
+      responses:
+        '200':
+          description: Saved note, or null when it was deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DayNoteResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: |
+            Validation failed (`content` missing or → `day_note.content_too_long`,
+            `date` → `day_note.date_invalid`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  # ─── To-do lists ──────────────────────────────────────────────
+  /todo-lists:
+    get:
+      tags: [TodoLists]
+      operationId: listTodoLists
+      summary: List own to-do lists (without content)
+      description: Ordered by `updated_at` descending.
+      responses:
+        '200':
+          description: To-do list summaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TodoListSummaryListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    post:
+      tags: [TodoLists]
+      operationId: createTodoList
+      summary: Create a to-do list
+      description: '`content` is HTML (Quill editor output); it is sanitized on the server.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTodoListRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TodoListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Validation failed (`title` → `todo_list.title_length`, `content` → `todo_list.content_too_long`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /todo-lists/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      tags: [TodoLists]
+      operationId: getTodoList
+      summary: Get one to-do list with content
+      responses:
+        '200':
+          description: The to-do list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TodoListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    patch:
+      tags: [TodoLists]
+      operationId: updateTodoList
+      summary: Update a to-do list
+      description: Partial update – omitted (or `null`) fields keep their value. `content` is sanitized HTML.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTodoListRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TodoListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Validation failed (`title` → `todo_list.title_length`, `content` → `todo_list.content_too_long`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    delete:
+      tags: [TodoLists]
+      operationId: deleteTodoList
+      summary: Delete a to-do list
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  # ─── Statistics ───────────────────────────────────────────────
+  /stats/categories:
+    get:
+      tags: [Statistics]
+      operationId: getCategoryStatistics
+      summary: Totals per category
+      description: |
+        Minutes and counts per status for every category (including ones without events, as zeros),
+        for events in `[from, to)`. The period may be at most 5 years.
+      parameters:
+        - $ref: '#/components/parameters/FromQuery'
+        - $ref: '#/components/parameters/ToQuery'
+      responses:
+        '200':
+          description: Category statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryStatisticsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/StatisticsValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /stats/subcategories:
+    get:
+      tags: [Statistics]
+      operationId: getSubcategoryStatistics
+      summary: Totals per subcategory
+      description: |
+        One row per user's subcategory (zeros included), grouped by category in category order.
+        Events without a subcategory are reported as an extra row per category with
+        `subcategory: null` (only when there are such events). Period at most 5 years.
+      parameters:
+        - $ref: '#/components/parameters/FromQuery'
+        - $ref: '#/components/parameters/ToQuery'
+        - name: category
+          in: query
+          required: false
+          description: Only this category
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Subcategory statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubcategoryStatisticsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: |
+            Validation failed (`to` → `stats.period.to_before_from` / `stats.period.too_long`,
+            `category` → `not.found.category`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /stats/timeline:
+    get:
+      tags: [Statistics]
+      operationId: getTimelineStatistics
+      summary: Minutes per category over time
+      description: |
+        A continuous series of buckets (day / week starting Monday / month) in the user's timezone,
+        from the bucket containing `from` up to the last bucket starting before `to` – empty buckets
+        are included. Each bucket lists minutes for every category. At most 400 buckets.
+        By default only `done` events are counted.
+      parameters:
+        - $ref: '#/components/parameters/FromQuery'
+        - $ref: '#/components/parameters/ToQuery'
+        - name: groupBy
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/StatsGranularity'
+        - name: status
+          in: query
+          required: false
+          description: Comma-separated statuses to count, e.g. `done,skipped`. Defaults to `done`.
+          schema:
+            type: string
+            example: done,planned
+      responses:
+        '200':
+          description: Timeline
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimelineStatisticsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: |
+            Validation failed (`to` → `stats.period.to_before_from` / `stats.period.too_long`,
+            `groupBy` → `stats.timeline.too_many_buckets`, `status` → `event.status_invalid`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  # ─── Admin ────────────────────────────────────────────────────
+  /admin/users:
+    get:
+      tags: [Admin]
+      operationId: adminListUsers
+      summary: List users (paginated)
+      description: Ordered by id. Requires the `admin` role.
+      parameters:
+        - name: search
+          in: query
+          required: false
+          description: Case-insensitive substring of name or email
+          schema:
+            type: string
+            maxLength: 255
+        - name: page
+          in: query
+          required: false
+          description: 1-based page number (values < 1 are treated as 1)
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: One page of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /admin/users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    patch:
+      tags: [Admin]
+      operationId: adminUpdateUser
+      summary: Change a user's role and/or block state
+      description: |
+        At least one of `role`, `blocked` must be sent. Blocking revokes all of the user's refresh
+        tokens and takes effect immediately (their next request gets 403). Requires the `admin` role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateUserRequest'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Not allowed (`admin.cannot_demote_self`, `admin.cannot_block_self`, `admin.last_admin`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation failed (`role` → `admin.nothing_to_update` when neither field is sent)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    DatePath:
+      name: date
+      in: path
+      required: true
+      description: Calendar date `YYYY-MM-DD`
+      schema:
+        type: string
+        format: date
+        example: '2026-10-18'
+    FromQuery:
+      name: from
+      in: query
+      required: true
+      description: Start of the range (inclusive), ISO 8601 with timezone offset
+      schema:
+        type: string
+        format: date-time
+        example: '2026-10-12T00:00:00+02:00'
+    ToQuery:
+      name: to
+      in: query
+      required: true
+      description: End of the range (exclusive), ISO 8601 with timezone offset
+      schema:
+        type: string
+        format: date-time
+        example: '2026-10-19T00:00:00+02:00'
+    StatusListQuery:
+      name: status
+      in: query
+      required: false
+      description: Comma-separated statuses, e.g. `done,skipped`. Omitted = all statuses.
+      schema:
+        type: string
+        example: planned,done
+
+  responses:
+    Unauthorized:
+      description: Missing, invalid or expired access token, or the account no longer exists
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: true
+            status: 401
+            message: Invalid or expired token.
+    Forbidden:
+      description: The account is blocked (`auth.account_blocked`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: true
+            status: 403
+            message: auth.account_blocked
+    AdminForbidden:
+      description: Not an admin (`auth.forbidden.admin_only`) or the account is blocked (`auth.account_blocked`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource does not exist or belongs to another user (`not.found.*`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: true
+            status: 404
+            message: not.found.event
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+    EventValidationError:
+      description: |
+        Validation failed. Service-level keys: `title` → `event.title_length`,
+        `description` → `event.description_too_long`, `end_at` → `event.end_before_start` /
+        `event.too_long`, `category_id` → `not.found.category`, `subcategory_id` →
+        `not.found.subcategory` / `event.subcategory_category_mismatch`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+          example:
+            error: true
+            status: 422
+            message: Validation failed.
+            errors:
+              end_at: event.end_before_start
+    StatisticsValidationError:
+      description: Validation failed (`to` → `stats.period.to_before_from` / `stats.period.too_long`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+    TooManyRequests:
+      description: Rate limit exceeded (50 requests / 60 s per IP)
+      headers:
+        Retry-After:
+          description: Seconds to wait
+          schema:
+            type: integer
+            example: 60
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    # ─── Common ─────────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      required: [error, status, message]
+      properties:
+        error:
+          type: boolean
+          enum: [true]
+        status:
+          type: integer
+          description: HTTP status code
+          example: 404
+        message:
+          type: string
+          description: Translation key or English message
+          example: not.found.event
+
+    ValidationErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          required: [errors]
+          properties:
+            errors:
+              type: object
+              description: Field name → first error message (or translation key)
+              additionalProperties:
+                type: string
+              example:
+                email: Email must be a valid email address.
+
+    Timestamp:
+      type: string
+      description: PostgreSQL timestamptz as text, e.g. `2026-10-18 08:00:00.123456+00`
+      example: '2026-10-18 08:00:00.123456+00'
+
+    # ─── Enums ──────────────────────────────────────────────────
+    Role:
+      type: string
+      enum: [user, admin]
+
+    EventStatus:
+      type: string
+      enum: [planned, done, skipped]
+
+    StatsGranularity:
+      type: string
+      enum: [day, week, month]
+
+    # ─── Auth / users ───────────────────────────────────────────
+    User:
+      type: object
+      required: [id, name, email, role, timezone, created_at]
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Jan Novák
+        email:
+          type: string
+          format: email
+          example: jan@example.com
+        role:
+          $ref: '#/components/schemas/Role'
+        timezone:
+          type: string
+          description: IANA timezone identifier, used for week boundaries and statistics
+          example: Europe/Prague
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    AdminUser:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          required: [blocked_at]
+          properties:
+            blocked_at:
+              type: string
+              allOf:
+                - $ref: '#/components/schemas/Timestamp'
+              nullable: true
+              description: When the user was blocked; null = not blocked
+
+    UserResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+
+    AuthResponse:
+      type: object
+      required: [token, refresh_token, user]
+      properties:
+        token:
+          type: string
+          description: 'JWT access token for the `Authorization: Bearer` header'
+        refresh_token:
+          type: string
+          description: Opaque refresh token for `/auth/refresh` and `/auth/logout`
+        user:
+          $ref: '#/components/schemas/User'
+
+    LogoutResponse:
+      type: object
+      required: [logged_out]
+      properties:
+        logged_out:
+          type: boolean
+          enum: [true]
+
+    RegisterRequest:
+      type: object
+      required: [name, email, password, password_confirm]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        password:
+          type: string
+          minLength: 8
+        password_confirm:
+          type: string
+          description: Must equal `password`
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        password:
+          type: string
+
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          description: The `refresh_token` from a previous auth response
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          nullable: true
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          nullable: true
+          description: Stored lowercase
+        timezone:
+          type: string
+          nullable: true
+          description: IANA timezone identifier
+          example: Europe/Prague
+
+    ChangePasswordRequest:
+      type: object
+      required: [current_password, password, password_confirm]
+      properties:
+        current_password:
+          type: string
+        password:
+          type: string
+          minLength: 8
+        password_confirm:
+          type: string
+          description: Must equal `password`
+
+    DeleteAccountRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          description: Current password as confirmation
+
+    # ─── Categories ─────────────────────────────────────────────
+    Category:
+      type: object
+      required: [id, slug, name, position]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+          example: strength
+        name:
+          type: string
+        position:
+          type: integer
+          description: Display order
+
+    CategoryRef:
+      type: object
+      required: [id, slug, name]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          type: string
+
+    CategoryListResponse:
+      type: object
+      required: [categories]
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+
+    # ─── Subcategories ──────────────────────────────────────────
+    Color:
+      type: string
+      pattern: '^#[0-9A-Fa-f]{6}$'
+      description: '`#RRGGBB`, stored lowercase'
+      example: '#4363d8'
+
+    Subcategory:
+      type: object
+      required: [id, category_id, name, color, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        category_id:
+          type: integer
+        name:
+          type: string
+        color:
+          $ref: '#/components/schemas/Color'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    SubcategoryResponse:
+      type: object
+      required: [subcategory]
+      properties:
+        subcategory:
+          $ref: '#/components/schemas/Subcategory'
+
+    SubcategoryListResponse:
+      type: object
+      required: [subcategories]
+      properties:
+        subcategories:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subcategory'
+
+    CreateSubcategoryRequest:
+      type: object
+      required: [category_id, name]
+      properties:
+        category_id:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        color:
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/Color'
+          nullable: true
+          description: Omitted / null / empty = next free palette color
+
+    UpdateSubcategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          nullable: true
+        color:
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/Color'
+          nullable: true
+
+    # ─── Events ─────────────────────────────────────────────────
+    Event:
+      type: object
+      required:
+        - id
+        - category_id
+        - subcategory_id
+        - title
+        - description
+        - start_at
+        - end_at
+        - duration_minutes
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+        category_id:
+          type: integer
+        subcategory_id:
+          type: integer
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        start_at:
+          type: string
+          format: date-time
+          example: '2026-10-18T08:00:00+00:00'
+        end_at:
+          type: string
+          format: date-time
+          example: '2026-10-18T09:30:00+00:00'
+        duration_minutes:
+          type: integer
+          example: 90
+        status:
+          $ref: '#/components/schemas/EventStatus'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    EventResponse:
+      type: object
+      required: [event]
+      properties:
+        event:
+          $ref: '#/components/schemas/Event'
+
+    EventListResponse:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+
+    CreateEventRequest:
+      type: object
+      required: [title, start_at, end_at, category_id]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 150
+        start_at:
+          type: string
+          format: date-time
+          description: ISO 8601 with timezone offset
+          example: '2026-10-18T10:00:00.000Z'
+        end_at:
+          type: string
+          format: date-time
+          description: ISO 8601 with timezone offset; after `start_at`, at most 24 h later
+          example: '2026-10-18T11:30:00.000Z'
+        category_id:
+          type: integer
+        subcategory_id:
+          type: integer
+          nullable: true
+          description: Must belong to the user and to `category_id`
+        description:
+          type: string
+          maxLength: 5000
+          nullable: true
+        status:
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/EventStatus'
+          nullable: true
+          description: Default – `planned` for a future start, `done` for a past one
+
+    UpdateEventRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 150
+        start_at:
+          type: string
+          format: date-time
+          nullable: true
+        end_at:
+          type: string
+          format: date-time
+          nullable: true
+        category_id:
+          type: integer
+          nullable: true
+        subcategory_id:
+          type: integer
+          nullable: true
+          description: '`null` removes the subcategory'
+        description:
+          type: string
+          maxLength: 5000
+          nullable: true
+          description: '`null` or empty clears the description'
+        status:
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/EventStatus'
+          nullable: true
+
+    # ─── Week / day notes ───────────────────────────────────────
+    DayNote:
+      type: object
+      required: [date, content, created_at, updated_at]
+      properties:
+        date:
+          type: string
+          format: date
+          example: '2026-10-18'
+        content:
+          type: string
+          maxLength: 5000
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    DayNoteResponse:
+      type: object
+      required: [note]
+      properties:
+        note:
+          type: object
+          allOf:
+            - $ref: '#/components/schemas/DayNote'
+          nullable: true
+
+    SaveDayNoteRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          maxLength: 5000
+          nullable: true
+          description: Plain text. Empty / null deletes the note.
+
+    WeekInfo:
+      type: object
+      required: [iso_week, start, end]
+      properties:
+        iso_week:
+          type: string
+          description: ISO week of the Monday – handy for prev/next navigation
+          example: 2026-W42
+        start:
+          type: string
+          format: date-time
+          description: Monday 00:00 in the user's timezone
+          example: '2026-10-12T00:00:00+02:00'
+        end:
+          type: string
+          format: date-time
+          description: Next Monday 00:00 in the user's timezone (exclusive)
+          example: '2026-10-19T00:00:00+02:00'
+
+    WeekResponse:
+      type: object
+      required: [week, events, notes]
+      properties:
+        week:
+          $ref: '#/components/schemas/WeekInfo'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        notes:
+          type: array
+          items:
+            $ref: '#/components/schemas/DayNote'
+
+    # ─── To-do lists ────────────────────────────────────────────
+    TodoListSummary:
+      type: object
+      required: [id, title, updated_at]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    TodoList:
+      type: object
+      required: [id, title, content, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+          description: Sanitized HTML
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    TodoListSummaryListResponse:
+      type: object
+      required: [todo_lists]
+      properties:
+        todo_lists:
+          type: array
+          items:
+            $ref: '#/components/schemas/TodoListSummary'
+
+    TodoListResponse:
+      type: object
+      required: [todo_list]
+      properties:
+        todo_list:
+          $ref: '#/components/schemas/TodoList'
+
+    CreateTodoListRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        content:
+          type: string
+          nullable: true
+          description: 'HTML, at most 102 400 bytes. Allowed tags: p, br, blockquote, pre, span, strong, b, em, i, u, s, h1–h4, ul, ol, li, a, table elements.'
+
+    UpdateTodoListRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+          nullable: true
+        content:
+          type: string
+          nullable: true
+          description: HTML, at most 102 400 bytes
+
+    # ─── Statistics ─────────────────────────────────────────────
+    StatusAmount:
+      type: object
+      required: [minutes, count]
+      properties:
+        minutes:
+          type: integer
+        count:
+          type: integer
+
+    CompletionRate:
+      type: object
+      description: done / (done + skipped), 0–1. Null when nothing was done or skipped.
+      required: [by_count, by_minutes]
+      properties:
+        by_count:
+          type: number
+          format: float
+          nullable: true
+          example: 0.75
+        by_minutes:
+          type: number
+          format: float
+          nullable: true
+          example: 0.8
+
+    StatusTotals:
+      type: object
+      required: [planned, done, skipped, completion_rate]
+      properties:
+        planned:
+          $ref: '#/components/schemas/StatusAmount'
+        done:
+          $ref: '#/components/schemas/StatusAmount'
+        skipped:
+          $ref: '#/components/schemas/StatusAmount'
+        completion_rate:
+          $ref: '#/components/schemas/CompletionRate'
+
+    CategoryStatistics:
+      allOf:
+        - type: object
+          required: [category]
+          properties:
+            category:
+              $ref: '#/components/schemas/CategoryRef'
+        - $ref: '#/components/schemas/StatusTotals'
+
+    CategoryStatisticsResponse:
+      type: object
+      required: [categories]
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryStatistics'
+
+    SubcategoryRef:
+      type: object
+      required: [id, name, color]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          $ref: '#/components/schemas/Color'
+
+    SubcategoryStatistics:
+      allOf:
+        - type: object
+          required: [category, subcategory]
+          properties:
+            category:
+              $ref: '#/components/schemas/CategoryRef'
+            subcategory:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/SubcategoryRef'
+              nullable: true
+              description: null = the category's events without a subcategory ("unassigned")
+        - $ref: '#/components/schemas/StatusTotals'
+
+    SubcategoryStatisticsResponse:
+      type: object
+      required: [subcategories]
+      properties:
+        subcategories:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubcategoryStatistics'
+
+    TimelineCategoryMinutes:
+      type: object
+      required: [category_id, minutes]
+      properties:
+        category_id:
+          type: integer
+        minutes:
+          type: integer
+
+    TimelineBucket:
+      type: object
+      required: [bucket, total_minutes, categories]
+      properties:
+        bucket:
+          type: string
+          format: date
+          description: Local start date of the bucket in the user's timezone
+          example: '2026-10-12'
+        total_minutes:
+          type: integer
+        categories:
+          type: array
+          description: Every category, in category order
+          items:
+            $ref: '#/components/schemas/TimelineCategoryMinutes'
+
+    TimelineStatisticsResponse:
+      type: object
+      required: [group_by, buckets]
+      properties:
+        group_by:
+          $ref: '#/components/schemas/StatsGranularity'
+        buckets:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineBucket'
+
+    # ─── Admin ──────────────────────────────────────────────────
+    AdminUserResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: '#/components/schemas/AdminUser'
+
+    AdminUserListResponse:
+      type: object
+      required: [users, total, page, per_page]
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUser'
+        total:
+          type: integer
+          description: Number of users matching the search
+        page:
+          type: integer
+        per_page:
+          type: integer
+
+    AdminUpdateUserRequest:
+      type: object
+      description: At least one field must be present.
+      properties:
+        role:
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/Role'
+          nullable: true
+        blocked:
+          type: boolean
+          nullable: true
+          description: true = block (revokes all sessions), false = unblock
