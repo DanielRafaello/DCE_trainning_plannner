@@ -1,7 +1,0 @@
-{
-    "name": "DCE schedule application planner Frontend (Vue.js)",
-    "dockerComposeFile": "../../docker-compose.yml",
-    "service": "frontend",
-    "workspaceFolder": "/app",
-
-}
