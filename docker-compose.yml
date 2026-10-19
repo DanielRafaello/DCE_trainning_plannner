@@ -7,37 +7,41 @@ services:
     ports:
       - "8080:80"
     volumes:
-        # Application source code from host (src/, templates/, config/, ...)
-        - ./backend:/app
-        # Vhost Apache configuration
-        - ./backend/docker/apache/vhost.conf:/etc/apache2/sites-available/000-default.conf
+      # Application source code from host (src/, templates/, config/, ...)
+      - ./backend:/app
+      # Vhost Apache configuration
+      - ./backend/docker/apache/vhost.conf:/etc/apache2/sites-available/000-default.conf
 
-        # Performance optimization for Windows: vendor/ and var/cache/ are overridden by anonymous volumes that live
-        # inside Docker (Linux overlay FS). Without this, thousands of files on Windows FS and each stat()
-        # over WSL2 bridge takes 1-3 ms → 10+ s per request.
-        - /app/vendor
-        - /app/var/cache
+      # Performance optimization for Windows: vendor/ and var/cache/ are overridden by anonymous volumes that live
+      # inside Docker (Linux overlay FS). Without this, thousands of files on Windows FS and each stat()
+      # over WSL2 bridge takes 1-3 ms → 10+ s per request.
+      - /app/vendor
+      - /app/var/cache
 
-        #
-        - ./docker-compose.yml:/app/docker-compose.yml
+      #
+      - ./docker-compose.yml:/app/docker-compose.yml
     depends_on:
       - db
 
-  frontend:
+  Training-planner-FE:
     build:
-      context: ./frontend
+      context: ./Training-planner-FE
       dockerfile: .devcontainer/Dockerfile
     container_name: app_frontend
     ports:
       - "5173:5173"
+    environment:
+      # Vite proxy target (vite.config.ts) – inside the docker network the backend is reachable by service name
+      BACKEND_URL: http://backend
+      # File changes on a Windows bind mount don't emit inotify events, so HMR needs polling
+      CHOKIDAR_USEPOLLING: "true"
     volumes:
-        # Application source code from host (src/, templates/, config/, ...)
-        - ./frontend:/app
-        - /app/node_modules
+      # Application source code from host (src/, templates/, config/, ...)
+      - ./Training-planner-FE:/app
+      - /app/node_modules
     depends_on:
       - backend
       - db
-
 
   db:
     image: postgres:18-alpine
@@ -74,7 +78,6 @@ services:
       || psql -d postgres -c \"CREATE DATABASE $$POSTGRES_DB\""
     restart: "no"
 
-    
   adminer:
     image: adminer
     container_name: app_adminer
@@ -85,7 +88,6 @@ services:
       ADMINER_DESIGN: dracula
     depends_on:
       - db
-
 
 volumes:
   db_data:
