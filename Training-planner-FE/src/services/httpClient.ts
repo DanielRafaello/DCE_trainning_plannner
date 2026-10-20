@@ -16,7 +16,7 @@ const axiosInstance: AxiosInstance = axios.create({
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
   // Needed only if the API runs on a different origin than the app (through the Vite proxy it's the same)
-  withCredentials: true,
+  withCredentials: true,  // add credentials () - the backend sets HttpOnly cookies on refresh
 });
 
 // Called when the session can't be recovered (refresh failed, account blocked).
