@@ -1,0 +1,209 @@
+/* ─── Shared UI classes ───────────────────────────────────── */
+
+/* Card */
+.card {
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  transition:
+    background-color var(--transition),
+    border-color var(--transition),
+    color var(--transition);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn-secondary {
+  border-color: var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border-strong);
+}
+
+.btn-ghost {
+  background: transparent;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--color-primary-soft);
+}
+
+.btn-danger {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* Forms */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field + .field {
+  margin-top: var(--space-4);
+}
+
+.label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.input {
+  width: 100%;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
+}
+
+.input:hover {
+  border-color: var(--color-border-strong);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.input.has-error {
+  border-color: var(--color-danger);
+}
+
+.field-error {
+  font-size: var(--font-size-xs);
+  color: var(--color-danger);
+}
+
+/* Small helpers */
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.text-sm {
+  font-size: var(--font-size-sm);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ─── Calendar event – frosted glass with a 3D feel ──────────
+   Color comes from the subcategory: <div class="event" :style="{ '--event-color': color }">
+   Layers: tinted translucent fill + blur, light top edge (inset highlight),
+   diagonal sheen (::before) and a soft drop shadow that grows on hover. */
+
+.event {
+  --event-color: var(--event-sky);
+
+  position: relative;
+  overflow: hidden;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-xs);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklab, var(--event-color) 45%, transparent),
+    color-mix(in oklab, var(--event-color) 22%, transparent)
+  );
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 color-mix(in oklab, var(--event-color) 35%, transparent),
+    var(--glass-shadow);
+  cursor: pointer;
+  transition:
+    transform var(--transition),
+    box-shadow var(--transition);
+}
+
+/* glossy sheen across the top half */
+.event::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 50% 0;
+  background: linear-gradient(180deg, var(--glass-highlight), transparent);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.event:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 color-mix(in oklab, var(--event-color) 35%, transparent),
+    var(--glass-shadow-hover);
+}
+
+.event-title {
+  position: relative;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.event-time {
+  position: relative;
+  color: var(--color-text-muted);
+}
+
+/* status variants (EventStatus) */
+.event.is-done {
+  opacity: 0.75;
+}
+
+.event.is-skipped {
+  opacity: 0.5;
+  filter: grayscale(0.6);
+}
+
+.event.is-skipped .event-title {
+  text-decoration: line-through;
+}

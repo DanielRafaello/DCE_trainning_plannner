@@ -1,0 +1,109 @@
+/* ─── Design tokens ──────────────────────────────────────────
+   Muted, low-saturation palette. Every color is a variable, so dark mode
+   only redefines the tokens below. */
+
+:root {
+  /* surfaces */
+  --color-bg: #f4f5f7;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8f9fb;
+  --color-border: #e4e6eb;
+  --color-border-strong: #d2d6dd;
+
+  /* text */
+  --color-text: #1f2430;
+  --color-text-muted: #6b7280;
+  --color-text-subtle: #9aa1ad;
+
+  /* accent – soft slate blue */
+  --color-primary: #5b6b8c;
+  --color-primary-hover: #4c5a78;
+  --color-primary-soft: #e8ebf2;
+  --color-on-primary: #ffffff;
+
+  /* states */
+  --color-success: #5f8f7a;
+  --color-warning: #b8955c;
+  --color-danger: #b5676a;
+  --color-danger-soft: #f6e9e9;
+
+  /* default event tints (subcategories bring their own color) */
+  --event-sage: #8fb5a3;
+  --event-sky: #8eaecf;
+  --event-lavender: #a99cc9;
+  --event-sand: #d4b98f;
+  --event-rose: #cf9ea4;
+
+  /* glass */
+  --glass-highlight: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --glass-shadow: 0 8px 24px -8px rgba(31, 36, 48, 0.18), 0 2px 6px -2px rgba(31, 36, 48, 0.08);
+  --glass-shadow-hover: 0 14px 32px -10px rgba(31, 36, 48, 0.24), 0 4px 10px -4px rgba(31, 36, 48, 0.1);
+
+  /* typography */
+  --font-sans:
+    'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.5rem;
+
+  /* spacing (4px scale) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* shape */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(31, 36, 48, 0.06);
+  --shadow-md: 0 4px 16px -4px rgba(31, 36, 48, 0.1);
+
+  --transition: 160ms ease;
+
+  /* layout */
+  --header-height: 56px;
+  --bottom-nav-height: 64px;
+  --content-max-width: 1400px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #15171c;
+    --color-surface: #1d2027;
+    --color-surface-muted: #23262e;
+    --color-border: #2e323b;
+    --color-border-strong: #3b404b;
+
+    --color-text: #e6e8ec;
+    --color-text-muted: #9ba1ad;
+    --color-text-subtle: #6c727e;
+
+    --color-primary: #8d9cbc;
+    --color-primary-hover: #a3b0cc;
+    --color-primary-soft: #2a2f3b;
+    --color-on-primary: #15171c;
+
+    --color-danger-soft: #3a2628;
+
+    --glass-highlight: rgba(255, 255, 255, 0.18);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --glass-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.5), 0 2px 6px -2px rgba(0, 0, 0, 0.3);
+    --glass-shadow-hover: 0 14px 32px -10px rgba(0, 0, 0, 0.6), 0 4px 10px -4px rgba(0, 0, 0, 0.35);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.4);
+
+    color-scheme: dark;
+  }
+}
