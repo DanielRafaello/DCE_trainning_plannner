@@ -1,9 +1,9 @@
 {
   "extends": "./tsconfig.app.json",
 
-  // Override to include only test files and clear exclusions.
-  // Application code imported in tests is automatically included via module resolution.
-  "include": ["src/**/__tests__/*", "env.d.ts", "tests/*"],
+  // Tests + the app sources they import – a composite project must list every file it type-checks
+  // (TS6307 otherwise). tsconfig.app.json excludes the tests in turn.
+  "include": ["src/**/*", "src/**/*.vue", "env.d.ts", "tests/*"],
   "exclude": [],
 
   "compilerOptions": {

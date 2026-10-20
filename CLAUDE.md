@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 TrainingPlanner is a personal weekly-timetable planner: events placed in a Mon–Sun week, assigned to fixed system categories and user-owned subcategories, plus day notes, rich-text to-do lists, statistics and admin user management.
 
 - `backend/` – PHP 8.5 JSON REST API (Slim 4, PHP-DI, Doctrine DBAL, PostgreSQL 18, JWT).
-- `Training-planner-FE/` – Vue 3 + TypeScript + Vite SPA (Pinia, vue-router, axios, Tailwind utils). Currently mostly scaffolding plus the generated API client.
+- `Training-planner-FE/` – Vue 3 + TypeScript + Vite SPA (Pinia, vue-router, axios, Quill). Czech UI. Plain CSS with design tokens, no Tailwind.
 - Specs: `backend/docs/functional-requirements.md` (v1.0.0 scope; requirement IDs such as `FR-EVT-01` are referenced from code docblocks), `backend/docs/roadmap-v2.0.0.md` (accepted future work), `backend/docs/ideas.md` (unaccepted proposals), and `backend/docs/openapi.yaml` (API contract).
 
 ## Running the stack
@@ -72,3 +72,14 @@ Scripts (in `Training-planner-FE/`): `npm run dev`, `npm run build` (vue-tsc typ
 - All generated calls go through the mutator `src/services/httpClient.ts`. It uses `withCredentials` cookie auth and, on a 401, refreshes the session once and then retries the request. Refreshes are serialized within a tab (shared promise) and across tabs (`navigator.locks`), because parallel refreshes would trigger the reuse detection and revoke all of the user's sessions. `/auth/*` responses never trigger a refresh. `setOnSessionExpired()` is the hook for redirecting to login.
 - `VITE_API_BASE_URL=/api` (`.env.development`) and goes through the Vite proxy. The proxy also rewrites the refresh cookie path `/auth` → `/api/auth`.
 - Path alias `@` → `src/`.
+
+Frontend structure and conventions:
+- **Routing** (`src/router/index.ts`): `/auth/*` under `AuthLayout` (guests only), everything else under `DefaultLayout` (calendar `/`, `/todo/:id?`, `/statistics`, `/profile`, `/admin`). A `beforeEach` guard reads `meta.requiresAuth / guestOnly / requiresAdmin` and calls `useAuthStore().loadUser()` (one `GET /me` per page load, because JS can't see the HttpOnly cookies).
+- **Stores**: `auth` (current user) and `catalog` (fixed categories + the user's subcategories, shared by the calendar, profile and statistics). `auth.setUser()` resets `catalog` when the user changes.
+- **Times**: `src/lib/dates.ts` computes everything in the **user's profile timezone** (`User.timezone`) via `Intl`, not the browser's. "Date keys" are `YYYY-MM-DD`. Send instants as `toISOString()`. Calendar layout lives in `lib/eventLayout.ts` and drag & drop math in `lib/reschedule.ts`. Both are covered by Vitest specs in `src/lib/__tests__/`.
+- **Forms**: `composables/useForm.ts` handles client validation (mirrors the backend rules in `lib/validation.ts`), maps 422 field errors to inputs and shows other errors as one message. All backend error keys and English validator sentences are translated to Czech in `lib/apiErrors.ts`. Add new keys there.
+- **Styling**: tokens in `src/assets/variables.css` (light + dark), shared classes (`.card`, `.btn-*`, `.input`, `.field`, `.segmented`, `.event` glass card) in `components.css`. Component-specific CSS is scoped.
+- **Dialogs**: `components/ui/BaseModal.vue` (native `<dialog>`) is mounted with `v-if` and emits `close`. Use `ConfirmButton` instead of `window.confirm`.
+- **To-do content** is Quill 2 HTML read from `quill.root.innerHTML` (not `getSemanticHTML`, which has a known XSS advisory). The backend sanitizes it against a Quill-aligned allowlist.
+- **Charts** (`components/stats/`): the muted category colors fail categorical-palette checks, so charts don't rely on them. Categories are identified by text labels, and statuses by lightness and hatching of a single hue.
+- **Containers**: after changing `package.json`, also run `docker compose exec training-planner-fe npm install`, because the container has its own `node_modules` volume.

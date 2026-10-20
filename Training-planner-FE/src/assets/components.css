@@ -68,6 +68,80 @@
   width: 100%;
 }
 
+.btn-sm {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-xs);
+}
+
+.btn-icon {
+  width: 40px;
+  padding: 0;
+}
+
+/* looks like a link, behaves like a button */
+.link-button {
+  align-self: flex-start;
+  padding: 0;
+  color: var(--color-primary);
+  background: none;
+  border: none;
+}
+
+.link-button:hover {
+  color: var(--color-primary-hover);
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* Segmented control (e.g. event status) */
+.segmented {
+  display: flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.segmented button {
+  flex: 1;
+  min-height: 34px;
+  padding: 0 var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-md) - 3px);
+  transition:
+    background-color var(--transition),
+    color var(--transition);
+}
+
+.segmented button.active {
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.color-dot {
+  flex-shrink: 0;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+}
+
+.page-title {
+  margin-bottom: var(--space-4);
+}
+
 /* Forms */
 .field {
   display: flex;
@@ -77,6 +151,19 @@
 
 .field + .field {
   margin-top: var(--space-4);
+}
+
+/* fields side by side – the stacking margin above must not push the 2nd one down */
+.field-row {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.field-row > .field + .field {
+  margin-top: 0;
 }
 
 .label {
@@ -116,6 +203,36 @@
   color: var(--color-danger);
 }
 
+.field-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-subtle);
+}
+
+/* Alerts */
+.alert {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+}
+
+.alert-danger {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+  border-color: color-mix(in oklab, var(--color-danger) 25%, transparent);
+}
+
+.alert-info {
+  color: var(--color-text);
+  background: var(--color-primary-soft);
+  border-color: color-mix(in oklab, var(--color-primary) 20%, transparent);
+}
+
+/* Login / register – "Don't have an account?" line */
+.auth-switch {
+  text-align: center;
+}
+
 /* Small helpers */
 .text-muted {
   color: var(--color-text-muted);
@@ -123,6 +240,10 @@
 
 .text-sm {
   font-size: var(--font-size-sm);
+}
+
+.text-success {
+  color: var(--color-success);
 }
 
 .stack {

@@ -1,10 +1,26 @@
 <script setup lang="ts">
-// TODO: show the admin link only for role === 'admin' once there is an auth store
-const navItems = [
+import { computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
+
+const auth = useAuthStore();
+const router = useRouter();
+
+const navItems = computed(() => [
   { name: 'calendar', label: 'Kalendář' },
+  { name: 'todo', label: 'To-do' },
+  { name: 'statistics', label: 'Statistiky' },
   { name: 'profile', label: 'Profil' },
-  { name: 'admin', label: 'Administrace' }
-];
+  ...(auth.isAdmin ? [{ name: 'admin', label: 'Admin' }] : [])
+]);
+
+async function onLogout(): Promise<void> {
+  try {
+    await auth.logout();
+  } finally {
+    await router.replace({ name: 'login' });
+  }
+}
 </script>
 
 <template>
@@ -16,6 +32,7 @@ const navItems = [
           {{ item.label }}
         </router-link>
       </nav>
+      <button type="button" class="btn btn-ghost" @click="onLogout">Odhlásit</button>
     </header>
 
     <main class="app-content">
@@ -56,6 +73,7 @@ const navItems = [
 .app-nav {
   display: flex;
   gap: var(--space-1);
+  margin-left: auto;
 }
 
 .app-nav a {
@@ -74,7 +92,8 @@ const navItems = [
   background: var(--color-surface-muted);
 }
 
-.app-nav .router-link-exact-active {
+/* not exact-active – /todo/5 must still highlight "To-do" */
+.app-nav .router-link-active {
   color: var(--color-primary);
   background: var(--color-primary-soft);
 }
@@ -108,9 +127,16 @@ const navItems = [
     -webkit-backdrop-filter: blur(12px);
   }
 
+  /* up to 5 items have to fit a 320px screen */
   .app-nav a {
     flex: 1;
+    min-width: 0;
+    padding: var(--space-2) var(--space-1);
+    font-size: var(--font-size-xs);
     text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .app-content {
