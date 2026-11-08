@@ -60,24 +60,6 @@ services:
       timeout: 5s
       retries: 10
 
-  # Postgres creates POSTGRES_DB only on the very first start of an empty volume.
-  # This one-shot service recreates the database on every `up` if it was dropped.
-  db-init:
-    image: postgres:18-alpine
-    container_name: app_db_init
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      PGHOST: db
-      PGUSER: myapp
-      PGPASSWORD: myapp
-      POSTGRES_DB: myapp
-    command: >
-      sh -c "psql -d postgres -Atc \"SELECT 1 FROM pg_database WHERE datname = '$$POSTGRES_DB'\" | grep -q 1
-      || psql -d postgres -c \"CREATE DATABASE $$POSTGRES_DB\""
-    restart: "no"
-
   adminer:
     image: adminer
     container_name: app_adminer
